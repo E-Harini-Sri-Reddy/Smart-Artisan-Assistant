@@ -1,0 +1,134 @@
+/* SettingsPage.module.css */
+
+.page {
+  padding: 10px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  margin-top: 28px;
+
+  margin-bottom: 14px;
+
+  color: #9c6238;
+}
+
+.card {
+  background-color: white;
+}
+
+.profileLayout {
+  display: flex;
+
+  gap: 28px;
+}
+
+.avatarSection {
+  display: flex;
+
+  justify-content: center;
+
+  align-items: flex-start;
+}
+
+.avatarWrapper {
+  position: relative;
+}
+
+.cameraIcon {
+  position: absolute;
+
+  bottom: 0;
+
+  right: 0;
+
+  width: 28px;
+
+  height: 28px;
+
+  border-radius: 50%;
+
+  background-color: #9c6238;
+
+  color: white;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  border: 3px solid white;
+}
+
+.formSection {
+  flex: 1;
+}
+
+.preferenceRow {
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  gap: 20px;
+}
+
+.themeCard {
+  cursor: pointer;
+
+  min-width: 90px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  gap: 6px;
+
+  transition: 0.2s ease;
+}
+
+.themeCard:hover {
+  transform: translateY(-2px);
+}
+
+.activeTheme {
+  cursor: pointer;
+
+  min-width: 90px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  gap: 6px;
+
+  border: 1px solid #9c6238;
+
+  background-color: #f8f2eb;
+
+  color: #9c6238;
+}
+
+@media (max-width: 768px) {
+
+  .profileLayout {
+    flex-direction: column;
+
+    align-items: center;
+  }
+
+  .preferenceRow {
+    flex-direction: column;
+
+    align-items: flex-start;
+  }
+}

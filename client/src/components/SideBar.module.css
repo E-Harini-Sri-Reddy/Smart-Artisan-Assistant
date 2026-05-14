@@ -1,0 +1,133 @@
+.navbar {
+  width: 280px;
+  height: 100vh;
+
+  background-color: #4b3621;
+
+  border-right: 1px solid #e9ecef;
+
+  display: flex;
+  flex-direction: column;
+
+  padding: 24px 18px;
+}
+
+/* LOGO SECTION */
+
+.header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  margin-bottom: 40px;
+}
+
+.logo {
+  width: 180px;
+  height: auto;
+
+  object-fit: contain;
+}
+
+/* NAVIGATION LINKS */
+
+.links {
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+
+  flex: 1;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+
+  gap: 14px;
+
+  padding: 14px 16px;
+
+  border-radius: 14px;
+
+  text-decoration: none;
+
+  color: #f5f5f5;
+
+  font-size: 15px;
+  font-weight: 500;
+
+  transition: all 0.2s ease;
+}
+
+.link:hover {
+  background-color: #f5f5f5;
+
+  color: #2b2b2b;
+}
+
+/* ACTIVE ROUTE */
+
+.active {
+  background-color: rgba(255, 255, 255, 0.15);
+
+  color: #ffffff;
+}
+
+.active:hover {
+  background-color: #f5f5f5;
+
+  color: #2b2b2b;
+}
+
+/* FOOTER */
+
+.footer {
+  padding-top: 20px;
+
+  border-top: 1px solid #e9ecef;
+
+  text-align: center;
+
+  font-size: 14px;
+
+  color: #888888;
+}
+
+.bottomSection {
+  margin-top: auto;
+
+  padding-top: 20px;
+}
+
+.logoutButton {
+  width: 100%;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+
+  padding: 12px 14px;
+
+  border: none;
+
+  background: transparent;
+
+  color: #c92a2a;
+
+  border-radius: 10px;
+
+  cursor: pointer;
+
+  transition: 0.2s ease;
+
+  font-size: 15px;
+
+  font-weight: 500;
+}
+
+.logoutButton:hover {
+  background-color: #fff5f5;
+}

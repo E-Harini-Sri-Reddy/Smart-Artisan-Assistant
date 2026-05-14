@@ -1,0 +1,153 @@
+.page {
+  padding: 10px;
+}
+
+.header {
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+}
+
+.dateBox {
+  background-color: white;
+}
+
+.statCard {
+  transition: 0.2s ease;
+}
+
+.statCard:hover {
+  transform: translateY(-3px);
+}
+
+.iconBox {
+  width: 50px;
+
+  height: 50px;
+
+  border-radius: 14px;
+
+  background-color: #f8f2eb;
+
+  color: #9c6238;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+}
+
+.greenIconBox {
+  width: 50px;
+
+  height: 50px;
+
+  border-radius: 14px;
+
+  background-color: #edf7ed;
+
+  color: green;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+}
+
+.chartGrid {
+  display: grid;
+
+  grid-template-columns: 1fr 1fr;
+
+  gap: 20px;
+
+  margin-top: 24px;
+}
+
+.chartCard {
+  min-height: 420px;
+}
+
+.chartContainer {
+  height: 280px;
+
+  display: flex;
+
+  align-items: flex-end;
+
+  justify-content: space-around;
+
+  margin-top: 30px;
+}
+
+.barWrapper {
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  justify-content: flex-end;
+
+  height: 100%;
+}
+
+.bar {
+  width: 52px;
+
+  background-color: #b87333;
+
+  border-radius: 14px 14px 0 0;
+
+  transition: 0.2s ease;
+}
+
+.bar:hover {
+  opacity: 0.8;
+}
+
+.legendBox {
+  width: 14px;
+
+  height: 14px;
+
+  border-radius: 4px;
+
+  background-color: #b87333;
+}
+
+.productList {
+  margin-top: 24px;
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 28px;
+}
+
+.productItem {
+  width: 100%;
+}
+
+@media (max-width: 992px) {
+
+  .chartGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+
+  .header {
+    flex-direction: column;
+
+    align-items: flex-start;
+
+    gap: 14px;
+  }
+}

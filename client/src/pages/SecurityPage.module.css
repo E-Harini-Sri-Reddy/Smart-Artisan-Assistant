@@ -1,0 +1,46 @@
+/* SecurityPage.module.css */
+
+.page {
+  padding: 10px;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.card {
+  background-color: white;
+}
+
+.preferenceRow {
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  gap: 24px;
+}
+
+.sectionHeader {
+  display: flex;
+
+  align-items: center;
+
+  gap: 10px;
+}
+
+.description {
+  max-width: 650px;
+
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+
+  .preferenceRow {
+    flex-direction: column;
+
+    align-items: flex-start;
+  }
+}
