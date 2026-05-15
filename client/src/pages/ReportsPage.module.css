@@ -74,13 +74,10 @@
 
 .chartContainer {
   height: 280px;
-
   display: flex;
-
   align-items: flex-end;
-
-  justify-content: space-around;
-
+  justify-content: flex-start; /* IMPORTANT CHANGE */
+  gap: 18px; /* ✅ THIS CREATES REAL BAR GAP */
   margin-top: 30px;
 }
 
@@ -97,7 +94,7 @@
 }
 
 .bar {
-  width: 52px;
+  width: 48px;
 
   background-color: #b87333;
 
