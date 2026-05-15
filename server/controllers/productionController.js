@@ -2,7 +2,7 @@ import Production from "../models/Production.js";
 import Payment from "../models/Payment.js";
 
 /**
- * DASHBOARD SUMMARY
+ * GET DASHBOARD SUMMARY DATA
  */
 export const getDashboardSummary = async (req, res) => {
   try {
@@ -18,7 +18,7 @@ export const getDashboardSummary = async (req, res) => {
     const totalRevenue = payments.reduce((acc, p) => acc + (p.amount || 0), 0);
     const actualProfit = totalRevenue - totalCost;
 
-    // 2. Pie Data (Categorized by Production)
+    // 2. Pie Chart Data (Category Distribution)
     const categoryMap = {};
     productions.forEach((p) => {
       categoryMap[p.category] = (categoryMap[p.category] || 0) + 1;
@@ -111,7 +111,7 @@ export const getDashboardSummary = async (req, res) => {
 };
 
 /**
- * CRUD Operations
+ * CRUD OPERATIONS
  */
 export const getProductions = async (req, res) => {
   try {
@@ -136,8 +136,13 @@ export const updateProduction = async (req, res) => {
     const updated = await Production.findByIdAndUpdate(
       req.params.id,
       req.body,
-      { new: true },
+      { returnDocument: "after", runValidators: true },
     );
+
+    if (!updated) {
+      return res.status(404).json({ message: "Record not found" });
+    }
+
     res.json(updated);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -146,8 +151,25 @@ export const updateProduction = async (req, res) => {
 
 export const deleteProduction = async (req, res) => {
   try {
-    await Production.findByIdAndDelete(req.params.id);
-    res.json({ message: "Deleted successfully" });
+    const { id } = req.params;
+    console.log("Attempting to delete ID:", id);
+
+    // Try deleting as a standard Mongoose ID first,
+    // then fallback to a string match if that fails.
+    let result = await Production.findByIdAndDelete(id);
+
+    if (!result) {
+      // Manual fallback for imported 'String' IDs
+      result = await Production.deleteOne({ _id: id });
+    }
+
+    if (result.deletedCount === 0 || !result) {
+      console.log("Delete failed: No record found in DB.");
+      return res.status(404).json({ message: "Record not found" });
+    }
+
+    console.log("Delete successful!");
+    res.status(200).json({ message: "Deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
