@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-
+import React, { useEffect, useState } from "react";
 import {
   IconArrowDownRight,
   IconArrowUpRight,
@@ -32,114 +31,35 @@ import {
   Cell,
 } from "recharts";
 
+import API from "../api/axios";
 import classes from "./HomePage.module.css";
-
-const statsData = [
-  {
-    title: "Today's Production",
-    value: "128 Items",
-    diff: 12,
-    icon: IconPackage,
-  },
-
-  {
-    title: "Monthly Earnings",
-    value: "₹12,450",
-    diff: 18,
-    icon: IconCurrencyRupee,
-  },
-
-  {
-    title: "Profit",
-    value: "₹4,240",
-    diff: -5,
-    icon: IconChartBar,
-  },
-
-  {
-    title: "New Customers",
-    value: "54",
-    diff: 21,
-    icon: IconUsers,
-  },
-
-  {
-    title: "Materials Used",
-    value: "842 kg",
-    diff: 9,
-    icon: IconHammer,
-  },
-];
-
-const weeklyData = [
-  { name: "Mon", earnings: 400 },
-  { name: "Tue", earnings: 700 },
-  { name: "Wed", earnings: 500 },
-  { name: "Thu", earnings: 900 },
-  { name: "Fri", earnings: 1100 },
-  { name: "Sat", earnings: 800 },
-  { name: "Sun", earnings: 1200 },
-];
-
-const monthlyData = [
-  { name: "1", earnings: 200 },
-  { name: "2", earnings: 350 },
-  { name: "3", earnings: 500 },
-  { name: "4", earnings: 420 },
-  { name: "5", earnings: 610 },
-  { name: "6", earnings: 720 },
-  { name: "7", earnings: 830 },
-  { name: "8", earnings: 650 },
-  { name: "9", earnings: 710 },
-  { name: "10", earnings: 800 },
-  { name: "11", earnings: 920 },
-  { name: "12", earnings: 780 },
-  { name: "13", earnings: 990 },
-  { name: "14", earnings: 1100 },
-  { name: "15", earnings: 950 },
-  { name: "16", earnings: 870 },
-  { name: "17", earnings: 1020 },
-  { name: "18", earnings: 1150 },
-  { name: "19", earnings: 980 },
-  { name: "20", earnings: 1050 },
-  { name: "21", earnings: 1200 },
-  { name: "22", earnings: 1350 },
-  { name: "23", earnings: 1180 },
-  { name: "24", earnings: 1250 },
-  { name: "25", earnings: 1400 },
-  { name: "26", earnings: 1320 },
-  { name: "27", earnings: 1500 },
-  { name: "28", earnings: 1450 },
-  { name: "29", earnings: 1380 },
-  { name: "30", earnings: 1550 },
-];
-
-const yearlyData = [
-  { name: "Jan", earnings: 4000 },
-  { name: "Feb", earnings: 5200 },
-  { name: "Mar", earnings: 6100 },
-  { name: "Apr", earnings: 5800 },
-  { name: "May", earnings: 7200 },
-  { name: "Jun", earnings: 8300 },
-  { name: "Jul", earnings: 9100 },
-  { name: "Aug", earnings: 8700 },
-  { name: "Sep", earnings: 9500 },
-  { name: "Oct", earnings: 10200 },
-  { name: "Nov", earnings: 11100 },
-  { name: "Dec", earnings: 12400 },
-];
-
-const pieData = [
-  { name: "Pottery", value: 240 },
-  { name: "Home Decor", value: 100 },
-  { name: "Figurines", value: 120 },
-  { name: "Others", value: 60 },
-];
 
 const COLORS = ["#4b3621", "#8b5e3c", "#c4a484", "#e6d3c3"];
 
 export const HomePage = () => {
-  const [filter, setFilter] = useState("This Week");
+  const [filter, setFilter] = useState("This Month");
+  const [summary, setSummary] = useState(null);
+
+  const [weeklyData, setWeeklyData] = useState([]);
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [yearlyData, setYearlyData] = useState([]);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
+
+  const fetchDashboard = async () => {
+    try {
+      const { data } = await API.get("/production/dashboard/summary");
+      setSummary(data);
+      setWeeklyData(data.weeklyData || []);
+      setMonthlyData(data.monthlyData || []);
+      setYearlyData(data.yearlyData || []);
+    } catch (err) {
+      console.error("Failed to fetch dashboard data:", err);
+    }
+  };
+
   const earningsData =
     filter === "This Week"
       ? weeklyData
@@ -147,9 +67,41 @@ export const HomePage = () => {
         ? monthlyData
         : yearlyData;
 
+  const statsData = [
+    {
+      title: "Total Production Items",
+      value: summary?.totalItems || 0,
+      diff: 12,
+      icon: IconPackage,
+    },
+    {
+      title: "Total Costs",
+      value: `₹${summary?.totalCost || 0}`,
+      diff: 18,
+      icon: IconCurrencyRupee,
+    },
+    {
+      title: "Total Revenue",
+      value: `₹${summary?.totalRevenue || 0}`,
+      diff: 10,
+      icon: IconCurrencyRupee,
+    },
+    {
+      title: "Net Profit",
+      value: `₹${summary?.actualProfit || 0}`,
+      diff: summary?.actualProfit >= 0 ? 5 : -5,
+      icon: IconChartBar,
+    },
+    {
+      title: "Materials Used",
+      value: "842 kg",
+      diff: 9,
+      icon: IconHammer,
+    },
+  ];
+
   const stats = statsData.map((stat) => {
     const DiffIcon = stat.diff > 0 ? IconArrowUpRight : IconArrowDownRight;
-
     const StatIcon = stat.icon;
 
     return (
@@ -160,40 +112,32 @@ export const HomePage = () => {
         key={stat.title}
         className={classes.card}
       >
-        <Group justify="space-between">
-          <div>
-            <Text
-              c="dimmed"
-              tt="uppercase"
-              fw={700}
-              fz="10px"
-              className={classes.label}
-            >
+        {/* wrap="nowrap" prevents the icon from dropping to the next line */}
+        <Group justify="space-between" wrap="nowrap" align="flex-start">
+          <div style={{ flex: 1 }}>
+            <Text c="dimmed" tt="uppercase" fw={700} fz="10px">
               {stat.title}
             </Text>
-
-            <Text fw={700} fz="24px" mt={3}>
+            <Text fw={700} fz="22px" mt={3}>
               {stat.value}
             </Text>
           </div>
-
           <ThemeIcon
-            size={44}
+            size={40}
             radius="xl"
             variant="light"
             color={stat.diff > 0 ? "teal" : "red"}
+            style={{ flexShrink: 0 }}
           >
-            <StatIcon size={24} stroke={1.8} />
+            <StatIcon size={22} stroke={1.8} />
           </ThemeIcon>
         </Group>
 
         <Group mt="sm" gap={6}>
           <DiffIcon size={16} color={stat.diff > 0 ? "teal" : "red"} />
-
           <Text c={stat.diff > 0 ? "teal" : "red"} fw={700} size="sm">
             {stat.diff}%
           </Text>
-
           <Text c="dimmed" size="sm">
             from last month
           </Text>
@@ -205,27 +149,20 @@ export const HomePage = () => {
   return (
     <div className={classes.page}>
       <Title order={2} mb="lg">
-        Hello, {JSON.parse(localStorage.getItem("userInfo"))?.name || "User"} 👋
+        Dashboard Overview
       </Title>
-
-      {/* STATS */}
 
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 5 }} spacing="md">
         {stats}
       </SimpleGrid>
 
-      {/* CHARTS */}
-
       <div className={classes.chartsContainer}>
-        {/* LINE CHART */}
-
         <Paper withBorder radius="lg" p="lg" className={classes.chartCard}>
           <Group justify="space-between" mb="lg">
-            <Title order={4}>Earnings Overview</Title>
-
+            <Title order={4}>Production Expenses Trend</Title>
             <Select
               value={filter}
-              onChange={setFilter}
+              onChange={(val) => setFilter(val)}
               data={["This Week", "This Month", "This Year"]}
               w={140}
             />
@@ -233,55 +170,65 @@ export const HomePage = () => {
 
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={earningsData}>
-              <XAxis dataKey="name" />
-
-              <YAxis />
-
+              <XAxis
+                dataKey="name"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => `₹${v}`}
+              />
               <Tooltip />
-
               <Line
                 type="monotone"
                 dataKey="earnings"
                 stroke="#4b3621"
                 strokeWidth={3}
+                dot={{ r: 4 }}
               />
             </LineChart>
           </ResponsiveContainer>
         </Paper>
 
-        {/* PIE CHART */}
-
         <Paper withBorder radius="lg" p="lg" className={classes.chartCard}>
           <Title order={4} mb="lg">
-            Production by Category
+            Category Distribution
           </Title>
-
-          <div className={classes.pieWrapper}>
+          <div style={{ position: "relative" }}>
             <ResponsiveContainer width="100%" height={320}>
               <PieChart>
                 <Pie
-                  data={pieData}
+                  data={summary?.pieData || []}
                   dataKey="value"
-                  innerRadius={85}
-                  outerRadius={120}
-                  paddingAngle={4}
+                  innerRadius={80}
+                  outerRadius={110}
+                  paddingAngle={5}
                 >
-                  {pieData.map((entry, index) => (
+                  {(summary?.pieData || []).map((_, index) => (
                     <Cell key={index} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
-
-            <div className={classes.centerText}>
-              <Text fw={700} size="28px">
-                600
+            <div
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                textAlign: "center",
+              }}
+            >
+              <Text fw={700} size="24px">
+                {summary?.totalItems || 0}
               </Text>
-
-              <Text c="dimmed" size="sm">
-                Total Items
+              <Text c="dimmed" size="xs">
+                Items
               </Text>
             </div>
           </div>
