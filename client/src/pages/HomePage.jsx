@@ -5,7 +5,6 @@ import {
   IconPackage,
   IconCurrencyRupee,
   IconChartBar,
-  IconUsers,
   IconHammer,
 } from "@tabler/icons-react";
 
@@ -56,11 +55,11 @@ export const HomePage = () => {
       setMonthlyData(data.monthlyData || []);
       setYearlyData(data.yearlyData || []);
     } catch (err) {
-      console.error("Failed to fetch dashboard data:", err);
+      console.error("Dashboard error:", err);
     }
   };
 
-  const earningsData =
+  const chartData =
     filter === "This Week"
       ? weeklyData
       : filter === "This Month"
@@ -112,7 +111,6 @@ export const HomePage = () => {
         key={stat.title}
         className={classes.card}
       >
-        {/* wrap="nowrap" prevents the icon from dropping to the next line */}
         <Group justify="space-between" wrap="nowrap" align="flex-start">
           <div style={{ flex: 1 }}>
             <Text c="dimmed" tt="uppercase" fw={700} fz="10px">
@@ -157,9 +155,10 @@ export const HomePage = () => {
       </SimpleGrid>
 
       <div className={classes.chartsContainer}>
+        {/* REVENUE LINE CHART */}
         <Paper withBorder radius="lg" p="lg" className={classes.chartCard}>
           <Group justify="space-between" mb="lg">
-            <Title order={4}>Production Expenses Trend</Title>
+            <Title order={4}>Revenue Trend</Title>
             <Select
               value={filter}
               onChange={(val) => setFilter(val)}
@@ -169,7 +168,7 @@ export const HomePage = () => {
           </Group>
 
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={earningsData}>
+            <LineChart data={chartData}>
               <XAxis
                 dataKey="name"
                 fontSize={12}
@@ -182,18 +181,19 @@ export const HomePage = () => {
                 axisLine={false}
                 tickFormatter={(v) => `₹${v}`}
               />
-              <Tooltip />
+              <Tooltip formatter={(value) => [`₹${value}`, "Revenue"]} />
               <Line
                 type="monotone"
-                dataKey="earnings"
+                dataKey="profit"
                 stroke="#4b3621"
                 strokeWidth={3}
-                dot={{ r: 4 }}
+                dot={{ r: 4, fill: "#4b3621" }}
               />
             </LineChart>
           </ResponsiveContainer>
         </Paper>
 
+        {/* PIE CHART */}
         <Paper withBorder radius="lg" p="lg" className={classes.chartCard}>
           <Title order={4} mb="lg">
             Category Distribution
