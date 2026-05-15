@@ -91,12 +91,6 @@ export const HomePage = () => {
       diff: summary?.actualProfit >= 0 ? 5 : -5,
       icon: IconChartBar,
     },
-    {
-      title: "Materials Used",
-      value: "842 kg",
-      diff: 9,
-      icon: IconHammer,
-    },
   ];
 
   const stats = statsData.map((stat) => {
@@ -150,7 +144,7 @@ export const HomePage = () => {
         Dashboard Overview
       </Title>
 
-      <SimpleGrid cols={{ base: 1, sm: 2, lg: 5 }} spacing="md">
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
         {stats}
       </SimpleGrid>
 
