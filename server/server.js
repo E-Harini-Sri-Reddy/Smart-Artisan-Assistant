@@ -14,6 +14,7 @@ import reportRoutes from "./routes/reportRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js"; // Added the new orders route import
+import inventoryRoutes from "./routes/inventoryRoutes.js";
 
 // Middleware Imports
 import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
@@ -51,6 +52,8 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/orders", orderRoutes); // Mounted to match your MoneyFlow.jsx calls
+app.use("/api/orders", orderRoutes);
+app.use("/api/inventory", inventoryRoutes); // Mount Inventory routes
 
 // Root Route
 app.get("/", (req, res) => {
