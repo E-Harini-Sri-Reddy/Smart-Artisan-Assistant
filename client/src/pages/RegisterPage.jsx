@@ -1,116 +1,100 @@
 import React, { useState } from "react";
-
-import {
-  Anchor,
-  Button,
-  Paper,
-  PasswordInput,
-  Text,
-  TextInput,
-  Title,
-} from "@mantine/core";
-
+import { Paper, Text, TextInput, Title, SegmentedControl, Box, Anchor } from "@mantine/core";
+import { GoogleLogin } from "@react-oauth/google";
 import { useNavigate } from "react-router-dom";
-
 import classes from "./LoginPage.module.css";
-
 import leftSideImage from "../images/left-side.png";
 
 export const RegisterPage = () => {
   const navigate = useNavigate();
+  const [role, setRole] = useState("artisan");
+  const [organizationName, setOrganizationName] = useState("");
 
-  const [name, setName] = useState("");
+  const handleGoogleSuccess = async (credentialResponse) => {
+    if (role === "organization" && !organizationName.trim()) {
+      alert("Please enter your Organization Name before continuing with Google.");
+      return;
+    }
 
-  const [email, setEmail] = useState("");
-
-  const [password, setPassword] = useState("");
-
-  const handleRegister = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/auth/register", {
+      const response = await fetch("http://localhost:5000/api/auth/google", {
         method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-        },
-
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name,
-          email,
-          password,
+          token: credentialResponse.credential,
+          role,
+          organizationName: role === "organization" ? organizationName : undefined,
         }),
       });
 
       const data = await response.json();
-
-      if (!response.ok) {
-        alert(data.message);
-        return;
+      if (response.ok) {
+        localStorage.setItem("userInfo", JSON.stringify(data));
+        // Use window.location to force a state refresh across the app
+        window.location.href = "/"; 
+      } else {
+        alert(data.message || "Registration failed");
       }
-
-      alert("Registration successful!");
-
-      navigate("/login");
     } catch (error) {
-      console.log(error);
-
-      alert("Server Error");
+      alert("Server error during Google Authentication");
     }
   };
 
   return (
     <div className={classes.page}>
       <div className={classes.loginContainer}>
-        {/* LEFT IMAGE */}
-
         <div className={classes.imageSection}>
           <img src={leftSideImage} alt="Register" className={classes.image} />
         </div>
 
-        {/* FORM */}
-
         <div className={classes.formSection}>
           <Paper className={classes.form}>
-            <Title order={2} className={classes.title}>
-              Create Account
-            </Title>
-
-            <TextInput
-              label="Full Name"
-              placeholder="John Doe"
-              mt="md"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+            <Title order={2} className={classes.title}>Join Assistant</Title>
+            
+            <Text size="sm" fw={500} mb={5}>I want to register as:</Text>
+            <SegmentedControl
+              fullWidth
+              mb="xl"
+              color="#4b3621"
+              value={role}
+              onChange={setRole}
+              data={[
+                { label: "Artisan", value: "artisan" },
+                { label: "Organization", value: "organization" },
+              ]}
             />
 
-            <TextInput
-              label="Email"
-              placeholder="hello@gmail.com"
-              mt="md"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+            {role === "organization" && (
+              <TextInput
+                label="Organization Name"
+                placeholder="e.g. Royal Weavers Guild"
+                mb="md"
+                required
+                value={organizationName}
+                onChange={(e) => setOrganizationName(e.target.value)}
+              />
+            )}
 
-            <PasswordInput
-              label="Password"
-              placeholder="Enter password"
-              mt="md"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <Box mt="xl" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => alert("Google Login Failed")}
+                text="signup_with"
+                theme="filled_blue"
+                shape="pill"
+                size="large"
+                width="300px"
+              />
+              
+              <Text size="xs" c="dimmed">
+                One-click secure registration via Google
+              </Text>
+            </Box>
 
-            <Button fullWidth mt="xl" color="#4b3621" onClick={handleRegister}>
-              Register
-            </Button>
-
-            <Text ta="center" mt="md">
+            <Text ta="center" mt="xl">
               Already have an account?{" "}
-              <Anchor
-                component="button"
-                c="#4b3621"
-                onClick={() => navigate("/login")}
-              >
-                Login
+              <Anchor component="button" fw={500} c="#4b3621" onClick={() => navigate("/login")}>
+                Login here
               </Anchor>
             </Text>
           </Paper>
