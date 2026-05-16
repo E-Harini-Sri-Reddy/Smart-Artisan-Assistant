@@ -34,7 +34,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // 1. CORS CONFIGURATION
-// Add your Render URL to allowed origins along with localhost if needed in production
 const allowedOrigins = [
   "http://localhost:5173",
   "https://smart-artisan-assistant-bn96.onrender.com",
@@ -43,7 +42,6 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
       if (allowedOrigins.indexOf(origin) !== -1) {
         return callback(null, true);
@@ -66,7 +64,12 @@ if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-// 4. API ROUTES
+// 4. SERVE FRONTEND STATIC ASSETS FIRST (For Production Environments)
+if (process.env.NODE_ENV === "production" || process.env.PORT) {
+  app.use(express.static(path.join(__dirname, "../client/dist")));
+}
+
+// 5. API ROUTES
 app.use("/api/auth", authRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/production", productionRoutes);
@@ -76,14 +79,10 @@ app.use("/api/users", userRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/inventory", inventoryRoutes);
 
-// 5. SERVE FRONTEND STATIC ASSETS IN PRODUCTION
-// Check if the application is running on Render/Production environment
+// 6. SPA FALLBACK ROUTING
 if (process.env.NODE_ENV === "production" || process.env.PORT) {
-  // Serve static files from Vite's compiled 'client/dist' directory
-  app.use(express.static(path.join(__dirname, "../client/dist")));
-
-  // Handle SPA client-side routing by returning index.html for non-API requests
-  app.get("*", (req, res) => {
+  // FIXED: Changed '*' to '*path' to support Express 5 / path-to-regexp parsing safely
+  app.get("*path", (req, res) => {
     res.sendFile(path.join(__dirname, "../client/dist", "index.html"));
   });
 } else {
@@ -93,13 +92,13 @@ if (process.env.NODE_ENV === "production" || process.env.PORT) {
   });
 }
 
-// 6. ERROR HANDLING
+// 7. ERROR HANDLING MIDDLEWARES
 app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-// 7. START SERVER
+// 8. START SERVER
 app.listen(PORT, () => {
   if (!process.env.GOOGLE_CLIENT_ID) {
     console.warn("⚠️ WARNING: GOOGLE_CLIENT_ID is not defined in .env file!");
