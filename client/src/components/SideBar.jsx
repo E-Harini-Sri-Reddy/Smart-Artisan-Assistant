@@ -46,12 +46,6 @@ const navItems = [
   },
 
   {
-    label: "AI Assistant",
-    icon: IconRobot,
-    link: "/ai-assistant",
-  },
-
-  {
     label: "Settings",
     icon: IconAdjustments,
     link: "/settings",
@@ -165,7 +159,7 @@ export const SideBar = () => {
         {/* FOOTER */}
 
         <div className={classes.footer}>
-          Smart Artisan v1.0.0
+          Smart Artisan
         </div>
 
       </div>
