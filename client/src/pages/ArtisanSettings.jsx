@@ -32,7 +32,7 @@ export function ArtisanSettings() {
       const fullPhone = `+91${phone}`;
       // Update this URL to match your backend route
       await axios.put(
-        "http://localhost:5000/api/users/profile", 
+        "/api/users/profile", 
         { phoneNumber: fullPhone },
         { headers: { Authorization: `Bearer ${userInfo.token}` } }
       );
