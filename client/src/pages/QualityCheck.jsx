@@ -1,32 +1,32 @@
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
-  Container,
-  Title,
-  Text,
-  Button,
-  Paper,
-  Stack,
-  Group,
   ActionIcon,
-  Image,
-  Loader,
   Badge,
-  RingProgress,
+  Button,
+  Container,
+  Group,
+  Image,
   List,
+  Loader,
+  Paper,
+  RingProgress,
+  Stack,
+  Text,
   ThemeIcon,
+  Title,
 } from "@mantine/core";
 import {
-  IconCamera,
   IconArrowLeft,
-  IconScan,
-  IconCircleCheck,
   IconBulb,
+  IconCamera,
+  IconCircleCheck,
+  IconEye,
+  IconScan,
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-const N8N_QC_WEBHOOK_URL =
-  "https://grouped-creatable-facial.ngrok-free.dev/webhook/b646e309-ae45-4460-a93e-cff13f6388bc";
+const N8N_QC_WEBHOOK_URL = import.meta.env.VITE_N8N_QC_WEBHOOK_URL;
 
 export function QualityCheck() {
   const navigate = useNavigate();
@@ -41,156 +41,193 @@ export function QualityCheck() {
   const startCamera = async () => {
     setCameraActive(true);
     setResult(null);
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       });
-      if (videoRef.current) videoRef.current.srcObject = stream;
-    } catch (err) {
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (error) {
+      console.error("Camera error:", error);
+      setCameraActive(false);
       alert("Camera access denied.");
     }
   };
 
-  const capturePhoto = () => {
-    const context = canvasRef.current.getContext("2d");
-    context.drawImage(videoRef.current, 0, 0, 640, 480);
-    setImage(canvasRef.current.toDataURL("image/jpeg"));
+  const stopCamera = () => {
+    videoRef.current?.srcObject?.getTracks().forEach((track) => {
+      track.stop();
+    });
 
-    if (videoRef.current && videoRef.current.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach((track) => track.stop());
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
+
     setCameraActive(false);
   };
 
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const context = canvas.getContext("2d");
+
+    context.drawImage(videoRef.current, 0, 0, 640, 480);
+
+    setImage(canvas.toDataURL("image/jpeg", 0.9));
+    stopCamera();
+  };
+
   const dataURItoBlob = (dataURI) => {
-    const byteString = atob(dataURI.split(",")[1]);
-    const mimeString = dataURI.split(",")[0].split(":")[1].split(";")[0];
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
-    for (let i = 0; i < byteString.length; i++) {
-      ia[i] = byteString.charCodeAt(i);
+    const [header, data] = dataURI.split(",");
+    const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
     }
-    return new Blob([ab], { type: mimeString });
+
+    return new Blob([bytes], { type: mime });
+  };
+
+  const parseResponse = (response) => {
+    let data = response;
+
+    if (Array.isArray(data)) {
+      data = data[0];
+    }
+
+    if (typeof data === "string") {
+      data = JSON.parse(data);
+    }
+
+    if (data?.output && typeof data.output === "string") {
+      try {
+        data = JSON.parse(data.output);
+      } catch {
+        // Keep original object if output isn't JSON
+      }
+    }
+
+    if (Array.isArray(data)) {
+      data = data[0];
+    }
+
+    if (!data || typeof data !== "object") {
+      throw new Error("Invalid response from n8n.");
+    }
+
+    const score = Number(data.quality_score);
+
+    if (Number.isNaN(score)) {
+      throw new Error("Invalid quality_score in n8n response.");
+    }
+
+    const safeScore = Math.min(Math.max(score, 0), 10);
+    const label = String(data.quality_label || "UNKNOWN").toUpperCase();
+
+    const observations = Array.isArray(data.observations)
+      ? data.observations
+      : data.observations
+        ? [data.observations]
+        : [];
+
+    const improvementTips = Array.isArray(data.improvement_tips)
+      ? data.improvement_tips
+      : data.improvement_tips
+        ? [data.improvement_tips]
+        : [];
+
+    let color = "orange";
+    let status = "Needs Improvement";
+
+    if (safeScore >= 8) {
+      color = "green";
+      status = "Excellent Quality";
+    } else if (safeScore >= 5) {
+      color = "blue";
+      status = "Good Quality";
+    }
+
+    return {
+      score: safeScore,
+      percentage: safeScore * 10,
+      label,
+      status,
+      color,
+      observations,
+      improvementTips,
+    };
   };
 
   const runQualityCheck = async () => {
-    if (!image) return alert("Please capture an image first!");
+    if (!image) {
+      alert("Please capture an image first!");
+      return;
+    }
 
     setLoading(true);
+    setResult(null);
+
     try {
-      const imageBlob = dataURItoBlob(image);
       const formData = new FormData();
-      formData.append("image", imageBlob, "artisan-product-qc.jpg");
+
+      formData.append("image", dataURItoBlob(image), "artisan-product-qc.jpg");
 
       const response = await axios.post(N8N_QC_WEBHOOK_URL, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
 
-      const responseData = response.data;
-      console.log("Raw Response from n8n:", responseData); 
+      console.log("n8n response:", response.data);
 
-      let textAnalysis = "";
-      let numericalScoreVal = 5; 
-
-      // FIXED PARSING ENGINE
-      if (Array.isArray(responseData) && responseData.length > 0) {
-        responseData.forEach((item) => {
-          if (!item) return;
-
-          // Dynamically check for either 'text' or 'output' keys
-          const rawValue = item.text || item.output;
-          if (!rawValue) return;
-
-          const currentStr = String(rawValue).trim();
-
-          // Check if the current value is a clean number
-          if (!isNaN(currentStr) && currentStr !== "") {
-            numericalScoreVal = parseInt(currentStr, 10);
-          } else {
-            textAnalysis = currentStr;
-          }
-        });
-      } else if (responseData) {
-        // Flat object fallback support
-        textAnalysis = responseData.text || responseData.output || "";
-        const fallbackScore = responseData.output || responseData.text;
-        if (fallbackScore && !isNaN(String(fallbackScore).trim())) {
-          numericalScoreVal = parseInt(String(fallbackScore).trim(), 10);
-        }
-      }
-
-      if (!textAnalysis) {
-        throw new Error(
-          "Could not parse textual output from n8n response structure.",
-        );
-      }
-
-      // Safeguard score between 1 and 10
-      if (isNaN(numericalScoreVal)) numericalScoreVal = 5;
-      const percentageRingValue = Math.min(
-        Math.max(numericalScoreVal * 10, 0),
-        100,
-      );
-
-      // Determine colors dynamically based on real parsed score
-      let statusText = "Excellent Quality";
-      let statusColor = "green";
-      if (numericalScoreVal <= 4) {
-        statusText = "Fair Finish";
-        statusColor = "orange";
-      } else if (numericalScoreVal <= 7) {
-        statusText = "Good Quality";
-        statusColor = "blue";
-      }
-
-      // Clean up layout presentation text lines
-      const dynamicTips = textAnalysis
-        .split("\n")
-        .map((line) => line.replace(/^[•\-\*\d\.\s]+/, "").trim())
-        .filter((line) => line.length > 0);
-
-      setResult({
-        percentageValue: percentageRingValue,
-        displayScore: numericalScoreVal,
-        status: statusText,
-        color: statusColor,
-        suggestions: dynamicTips.length > 0 ? dynamicTips : [textAnalysis],
-      });
+      setResult(parseResponse(response.data));
     } catch (error) {
-      console.error("Quality Check Processing Error Stack:", error);
-      alert("Error parsing dynamic data. Check browser console.");
-
-      setResult({
-        percentageValue: 70,
-        displayScore: 7,
-        status: "Good Quality",
-        color: "blue",
-        suggestions: [
-          "Fallback Mode: Check your browser developer tools console to see why the response failed to parse natively.",
-        ],
-      });
+      console.error("Quality check error:", error);
+      alert(error?.message || "Unable to process the quality check.");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleRetake = () => {
+    setImage(null);
+    setResult(null);
+    startCamera();
+  };
+
+  const reset = () => {
+    setImage(null);
+    setResult(null);
+  };
+
   return (
     <Container size="xs" py="xl">
       <Group mb="xl">
-        <ActionIcon variant="subtle" onClick={() => navigate("/")} color="gray">
+        <ActionIcon variant="subtle" color="gray" onClick={() => navigate("/")}>
           <IconArrowLeft size={24} />
         </ActionIcon>
+
         <Title order={3}>AI Quality Check</Title>
       </Group>
 
-      {!image && !cameraActive && (
+      {!image && !cameraActive && !result && (
         <Paper
           withBorder
           p="xl"
           radius="lg"
           ta="center"
           onClick={startCamera}
-          style={{ borderStyle: "dashed", cursor: "pointer" }}
+          style={{
+            borderStyle: "dashed",
+            cursor: "pointer",
+          }}
         >
           <Stack align="center">
             <IconScan size={50} color="orange" />
@@ -208,8 +245,12 @@ export function QualityCheck() {
             ref={videoRef}
             autoPlay
             playsInline
-            style={{ width: "100%", borderRadius: "16px" }}
+            style={{
+              width: "100%",
+              borderRadius: "16px",
+            }}
           />
+
           <Button
             color="orange"
             size="lg"
@@ -219,6 +260,7 @@ export function QualityCheck() {
           >
             Capture for Analysis
           </Button>
+
           <canvas
             ref={canvasRef}
             width="640"
@@ -231,17 +273,12 @@ export function QualityCheck() {
       {image && !loading && !result && (
         <Stack>
           <Image src={image} radius="md" />
-          <Button color="orange" size="md" onClick={runQualityCheck}>
+
+          <Button color="orange" onClick={runQualityCheck}>
             Run AI Audit
           </Button>
-          <Button
-            variant="subtle"
-            color="gray"
-            onClick={() => {
-              setImage(null);
-              startCamera();
-            }}
-          >
+
+          <Button variant="subtle" color="gray" onClick={handleRetake}>
             Retake
           </Button>
         </Stack>
@@ -250,6 +287,7 @@ export function QualityCheck() {
       {loading && (
         <Paper p="xl" ta="center">
           <Loader color="orange" size="lg" />
+
           <Text mt="md" fw={600}>
             Analyzing textures and symmetry...
           </Text>
@@ -265,55 +303,93 @@ export function QualityCheck() {
                 roundCaps
                 thickness={12}
                 sections={[
-                  { value: result.percentageValue, color: result.color },
+                  {
+                    value: result.percentage,
+                    color: result.color,
+                  },
                 ]}
                 label={
                   <Text ta="center" fw={900} size="xl">
-                    {result.displayScore}
+                    {result.score}
                   </Text>
                 }
               />
-              <Stack gap={0}>
+
+              <Stack gap={4}>
                 <Text fw={700} size="lg">
                   Quality Score
                 </Text>
-                <Badge color={result.color} variant="light">
+
+                <Badge color={result.color} variant="light" size="lg">
                   {result.status}
                 </Badge>
+
+                <Text size="xs" c="dimmed">
+                  {result.label} · {result.score}/10
+                </Text>
               </Stack>
             </Group>
           </Paper>
 
-          <Paper withBorder p="lg" radius="lg" bg="var(--mantine-color-gray-0)">
-            <Group mb="md">
-              <IconBulb color="orange" />
-              <Text fw={700}>AI Observations & Tips</Text>
-            </Group>
-            <List
-              spacing="sm"
-              size="sm"
-              center
-              icon={
-                <ThemeIcon color={result.color} size={20} radius="xl">
-                  <IconCircleCheck size={12} />
+          {result.observations.length > 0 && (
+            <Paper withBorder p="lg" radius="lg" shadow="sm">
+              <Group mb="md">
+                <ThemeIcon color="blue" variant="light" radius="xl">
+                  <IconEye size={18} />
                 </ThemeIcon>
-              }
-            >
-              {result.suggestions.map((tip, i) => (
-                <List.Item key={i}>{tip}</List.Item>
-              ))}
-            </List>
-          </Paper>
 
-          <Button
-            fullWidth
-            variant="light"
-            color="orange"
-            onClick={() => {
-              setResult(null);
-              setImage(null);
-            }}
-          >
+                <Text fw={700}>AI Observations</Text>
+              </Group>
+
+              <List
+                spacing="sm"
+                size="sm"
+                icon={
+                  <ThemeIcon color="blue" size={20} radius="xl">
+                    <IconCircleCheck size={12} />
+                  </ThemeIcon>
+                }
+              >
+                {result.observations.map((item, index) => (
+                  <List.Item key={index}>{item}</List.Item>
+                ))}
+              </List>
+            </Paper>
+          )}
+
+          {result.improvementTips.length > 0 && (
+            <Paper
+              withBorder
+              p="lg"
+              radius="lg"
+              shadow="sm"
+              bg="var(--mantine-color-gray-0)"
+            >
+              <Group mb="md">
+                <ThemeIcon color="orange" variant="light" radius="xl">
+                  <IconBulb size={18} />
+                </ThemeIcon>
+
+                <Text fw={700}>Improvement Tips</Text>
+              </Group>
+
+              <List
+                spacing="sm"
+                size="sm"
+                icon={
+                  <ThemeIcon color="orange" size={20} radius="xl">
+                    <IconCircleCheck size={12} />
+                  </ThemeIcon>
+                }
+              >
+                {result.improvementTips.map((item, index) => (
+                  <List.Item key={index}>{item}</List.Item>
+                ))}
+              </List>
+            </Paper>
+          )}
+
+          <Button fullWidth variant="light" color="orange" onClick={reset}>
             Scan New Item
           </Button>
         </Stack>
