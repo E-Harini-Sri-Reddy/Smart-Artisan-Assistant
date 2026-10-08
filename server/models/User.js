@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 const userSchema = mongoose.Schema(
   {
@@ -12,33 +13,63 @@ const userSchema = mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+      lowercase: true,
+      trim: true,
     },
 
     password: {
       type: String,
       required: true,
+      select: false,
     },
 
-    // Distinguish between the two types of users
+    /**
+     * Legacy UI role field. Prefer membership-derived role in auth responses.
+     * Kept for migration of existing documents.
+     */
     role: {
       type: String,
-      required: true,
       enum: ["artisan", "organization"],
       default: "artisan",
     },
 
-    // This field is only required if the user is an organization
+    /** Legacy string; real org identity lives in Organization + Membership */
     organizationName: {
       type: String,
-      required: function () {
-        return this.role === "organization";
-      },
     },
 
-    // Optional: Keep profession if you want artisans to specify their craft (e.g., Pottery, Weaving)
     profession: {
       type: String,
       default: "Artisan",
+    },
+
+    phoneNumber: {
+      type: String,
+      default: null,
+    },
+
+    authProvider: {
+      type: String,
+      enum: ["local", "google", "both"],
+      default: "local",
+    },
+
+    /**
+     * Placeholder for future email verification — not enforced yet.
+     */
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    passwordResetToken: {
+      type: String,
+      select: false,
+    },
+
+    passwordResetExpires: {
+      type: Date,
+      select: false,
     },
   },
   {
@@ -46,15 +77,22 @@ const userSchema = mongoose.Schema(
   },
 );
 
-/* MATCH PASSWORD */
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-/* HASH PASSWORD BEFORE SAVE */
-userSchema.pre("save", async function (next) {
+userSchema.methods.createPasswordResetToken = function () {
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  this.passwordResetToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+  this.passwordResetExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+  return resetToken;
+};
+
+userSchema.pre("save", async function () {
   if (!this.isModified("password")) {
-    next();
     return;
   }
 

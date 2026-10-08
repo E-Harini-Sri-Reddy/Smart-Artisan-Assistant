@@ -1,48 +1,39 @@
 import express from "express";
 import mongoose from "mongoose";
+import Order from "../models/Order.js";
+import { protect, requireArtisanAccess } from "../middlewares/authMiddleware.js";
+import { personalResourceFilter } from "../utils/tenantScope.js";
 
 const router = express.Router();
 
-// Define Schema for Order Tracking
-const OrderSchema = new mongoose.Schema({
-  artisanId: { type: String, required: true }, 
-  name: { type: String, required: true },
-  contact: { type: String },
-  product: { type: String, required: true },
-  pending: { type: Number, default: 0 },
-  delivered: { type: String, enum: ["Yes", "No"], default: "No" },
-  createdAt: { type: Date, default: Date.now }
-});
+router.use(protect, requireArtisanAccess);
 
-// Prevent compilation collisions during hot dev reloads
-const Order = mongoose.models.Order || mongoose.model("Order", OrderSchema);
-
-// 1. GET ALL ORDERS FOR ACTIVE ARTISAN
+// 1. GET ALL ORDERS FOR AUTHENTICATED OWNER
 router.get("/", async (req, res, next) => {
   try {
-    const { artisanId } = req.query;
-    if (!artisanId) {
-      return res.status(400).json({ message: "Missing artisanId query parameter" });
-    }
-    const orders = await Order.find({ artisanId }).sort({ createdAt: -1 });
+    const orders = await Order.find(personalResourceFilter(req.auth)).sort({
+      createdAt: -1,
+    });
     return res.json(orders);
   } catch (error) {
-    next(error); // Passes control to your server's errorHandler middleware
+    next(error);
   }
 });
 
 // 2. CREATE NEW ORDER
 router.post("/", async (req, res, next) => {
   try {
-    const { artisanId, name, contact, product, pending, delivered } = req.body;
-    
+    const { name, contact, product, pending, delivered } = req.body;
+
     const newOrder = new Order({
-      artisanId,
+      ownerUser: req.auth.userId,
+      artisanId: String(req.auth.userId),
+      organization: req.auth.organizationId || null,
       name,
       contact,
       product,
       pending,
-      delivered
+      delivered,
     });
 
     const savedOrder = await newOrder.save();
@@ -58,13 +49,23 @@ router.put("/:id", async (req, res, next) => {
     const { id } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid MongoDB Object ID format" });
+      return res
+        .status(400)
+        .json({ message: "Invalid MongoDB Object ID format" });
     }
 
-    const updatedOrder = await Order.findByIdAndUpdate(
-      id,
-      { $set: req.body },
-      { new: true, runValidators: true }
+    const { name, contact, product, pending, delivered } = req.body;
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (contact !== undefined) updates.contact = contact;
+    if (product !== undefined) updates.product = product;
+    if (pending !== undefined) updates.pending = pending;
+    if (delivered !== undefined) updates.delivered = delivered;
+
+    const updatedOrder = await Order.findOneAndUpdate(
+      { _id: id, ...personalResourceFilter(req.auth) },
+      { $set: updates },
+      { returnDocument: "after", runValidators: true },
     );
 
     if (!updatedOrder) {
@@ -77,4 +78,4 @@ router.put("/:id", async (req, res, next) => {
   }
 });
 
-export default router; // Clean ES Module export to match server.js imports
+export default router;

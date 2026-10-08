@@ -1,0 +1,16 @@
+{
+  "name": "smart-artisan",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently -n client,server -c cyan,magenta \"npm run dev --prefix client\" \"npm run dev --prefix server\"",
+    "dev:client": "npm run dev --prefix client",
+    "dev:server": "npm run dev --prefix server",
+    "build": "npm run build --prefix client",
+    "test": "npm test --prefix server",
+    "lint": "npm run lint --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

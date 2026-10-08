@@ -1,15 +1,20 @@
 import Production from "../models/Production.js";
 import Payment from "../models/Payment.js";
+import { organizationResourceFilter } from "../utils/tenantScope.js";
 
 /**
- * GET DASHBOARD SUMMARY DATA
+ * GET DASHBOARD SUMMARY DATA — organization-scoped
  */
 export const getDashboardSummary = async (req, res) => {
   try {
-    const productions = await Production.find();
-    const payments = await Payment.find({ status: "Completed" });
+    if (!req.auth?.isOrgAdmin || !req.auth.organizationId) {
+      return res.status(403).json({ message: "Organization admin access required" });
+    }
 
-    // 1. Financial Totals
+    const scope = organizationResourceFilter(req.auth);
+    const productions = await Production.find(scope);
+    const payments = await Payment.find({ ...scope, status: "Completed" });
+
     const totalItems = productions.length;
     const totalCost = productions.reduce(
       (acc, item) => acc + (item.cost || 0),
@@ -18,7 +23,6 @@ export const getDashboardSummary = async (req, res) => {
     const totalRevenue = payments.reduce((acc, p) => acc + (p.amount || 0), 0);
     const actualProfit = totalRevenue - totalCost;
 
-    // 2. Pie Chart Data (Category Distribution)
     const categoryMap = {};
     productions.forEach((p) => {
       categoryMap[p.category] = (categoryMap[p.category] || 0) + 1;
@@ -32,9 +36,6 @@ export const getDashboardSummary = async (req, res) => {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    /**
-     * WEEKLY REVENUE TREND
-     */
     const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const weeklyMap = {};
     payments.forEach((p) => {
@@ -50,9 +51,6 @@ export const getDashboardSummary = async (req, res) => {
       profit: weeklyMap[d] || 0,
     }));
 
-    /**
-     * MONTHLY REVENUE TREND
-     */
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const monthlyMap = Array(daysInMonth).fill(0);
     payments.forEach((p) => {
@@ -66,23 +64,10 @@ export const getDashboardSummary = async (req, res) => {
       profit: val,
     }));
 
-    /**
-     * YEARLY REVENUE TREND
-     */
     const yearMap = Array(12).fill(0);
     const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ];
     payments.forEach((p) => {
       const d = new Date(p.paymentDate);
@@ -110,12 +95,15 @@ export const getDashboardSummary = async (req, res) => {
   }
 };
 
-/**
- * CRUD OPERATIONS
- */
 export const getProductions = async (req, res) => {
   try {
-    const data = await Production.find().sort({ createdAt: -1 });
+    if (!req.auth?.isOrgAdmin || !req.auth.organizationId) {
+      return res.status(403).json({ message: "Organization admin access required" });
+    }
+
+    const data = await Production.find(
+      organizationResourceFilter(req.auth),
+    ).sort({ createdAt: -1 });
     res.json(data);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -124,7 +112,35 @@ export const getProductions = async (req, res) => {
 
 export const createProduction = async (req, res) => {
   try {
-    const item = await Production.create(req.body);
+    if (!req.auth?.isOrgAdmin || !req.auth.organizationId) {
+      return res.status(403).json({ message: "Organization admin access required" });
+    }
+
+    const {
+      productName,
+      category,
+      quantity,
+      unit,
+      materials,
+      cost,
+      date,
+      notes,
+      image,
+    } = req.body;
+
+    const item = await Production.create({
+      productName,
+      category,
+      quantity,
+      unit,
+      materials,
+      cost,
+      date,
+      notes,
+      image,
+      organization: req.auth.organizationId,
+      createdBy: req.auth.userId,
+    });
     res.status(201).json(item);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -133,9 +149,29 @@ export const createProduction = async (req, res) => {
 
 export const updateProduction = async (req, res) => {
   try {
-    const updated = await Production.findByIdAndUpdate(
-      req.params.id,
-      req.body,
+    if (!req.auth?.isOrgAdmin || !req.auth.organizationId) {
+      return res.status(403).json({ message: "Organization admin access required" });
+    }
+
+    const allowed = [
+      "productName",
+      "category",
+      "quantity",
+      "unit",
+      "materials",
+      "cost",
+      "date",
+      "notes",
+      "image",
+    ];
+    const updates = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+
+    const updated = await Production.findOneAndUpdate(
+      { _id: req.params.id, organization: req.auth.organizationId },
+      updates,
       { returnDocument: "after", runValidators: true },
     );
 
@@ -151,24 +187,20 @@ export const updateProduction = async (req, res) => {
 
 export const deleteProduction = async (req, res) => {
   try {
-    const { id } = req.params;
-    console.log("Attempting to delete ID:", id);
-
-    // Try deleting as a standard Mongoose ID first,
-    // then fallback to a string match if that fails.
-    let result = await Production.findByIdAndDelete(id);
-
-    if (!result) {
-      // Manual fallback for imported 'String' IDs
-      result = await Production.deleteOne({ _id: id });
+    if (!req.auth?.isOrgAdmin || !req.auth.organizationId) {
+      return res.status(403).json({ message: "Organization admin access required" });
     }
 
-    if (result.deletedCount === 0 || !result) {
-      console.log("Delete failed: No record found in DB.");
+    const { id } = req.params;
+    const result = await Production.findOneAndDelete({
+      _id: id,
+      organization: req.auth.organizationId,
+    });
+
+    if (!result) {
       return res.status(404).json({ message: "Record not found" });
     }
 
-    console.log("Delete successful!");
     res.status(200).json({ message: "Deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: err.message });

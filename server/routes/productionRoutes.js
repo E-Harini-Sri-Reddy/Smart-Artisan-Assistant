@@ -6,23 +6,20 @@ import {
   deleteProduction,
   getDashboardSummary,
 } from "../controllers/productionController.js";
+import { protect, requireOrgAdmin } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-/**
- * 1. DASHBOARD ROUTE (Specific/Static)
- * Must be first so 'dashboard' isn't caught by the ':id' parameter
- */
-router.get("/dashboard/summary", getDashboardSummary);
+router.get(
+  "/dashboard/summary",
+  protect,
+  requireOrgAdmin,
+  getDashboardSummary,
+);
 
-/**
- * 2. CRUD ROUTES (General)
- */
-router.get("/", getProductions);
-router.post("/", createProduction);
-
-// Routes with parameters should always come after specific paths
-router.put("/:id", updateProduction);
-router.delete("/:id", deleteProduction);
+router.get("/", protect, requireOrgAdmin, getProductions);
+router.post("/", protect, requireOrgAdmin, createProduction);
+router.put("/:id", protect, requireOrgAdmin, updateProduction);
+router.delete("/:id", protect, requireOrgAdmin, deleteProduction);
 
 export default router;

@@ -4,6 +4,8 @@ import "./App.css";
 
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { MainLayout } from "./layouts/MainLayout";
 
 // Organization Pages (Desktop Focused)
@@ -12,39 +14,41 @@ import { ProductionPage } from "./pages/ProductionPage";
 import { PaymentsPage } from "./pages/PaymentsPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { AIAssistantPage } from "./pages/AIAssistantPage";
-import { SettingsPage } from "./pages/SettingsPage"; 
+import { SettingsPage } from "./pages/SettingsPage";
 import { SecurityPage } from "./pages/SecurityPage";
 
-// Artisan Pages (Mobile Optimized)
+// Artisan Pages (Mobile Optimized) — also used by Organization Users
 import { ArtisanDashboard } from "./pages/ArtisanDashboard";
 import { MoneyFlow } from "./pages/MoneyFlow";
 import { ArtisanSettings } from "./pages/ArtisanSettings";
 import { PriceAnalyser } from "./pages/PriceAnalyser";
 import { InventoryPage } from "./pages/InventoryPage";
 import { QualityCheck } from "./pages/QualityCheck";
-import { AnalyticsPage } from "./pages/AnalyticsPage"; 
+import { AnalyticsPage } from "./pages/AnalyticsPage";
 
 function App() {
-  // Check login status
-  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("userInfo"));
-  
-  // Get user info to check role
-  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    !!localStorage.getItem("userInfo"),
+  );
+
+  const userInfo = JSON.parse(localStorage.getItem("userInfo") || "null");
+  // Organization Admins use org UI; Individual Artisans and Org Users use artisan UI
   const role = userInfo?.role;
 
   return (
     <BrowserRouter>
       <Routes>
         {/* PUBLIC ROUTES */}
-        <Route 
-          path="/login" 
-          element={<LoginPage setIsLoggedIn={setIsLoggedIn} />} 
+        <Route
+          path="/login"
+          element={<LoginPage setIsLoggedIn={setIsLoggedIn} />}
         />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
         {isLoggedIn ? (
           <>
-            {/* 1. ORGANIZATION FLOW (Desktop Sidebar Layout) */}
             {role === "organization" && (
               <Route element={<MainLayout />}>
                 <Route path="/" element={<HomePage />} />
@@ -57,7 +61,6 @@ function App() {
               </Route>
             )}
 
-            {/* 2. ARTISAN FLOW (Mobile Full-Screen Layout) */}
             {role === "artisan" && (
               <>
                 <Route path="/" element={<ArtisanDashboard />} />
@@ -70,11 +73,9 @@ function App() {
               </>
             )}
 
-            {/* FALLBACK FOR LOGGED IN USERS */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         ) : (
-          /* REDIRECT TO LOGIN IF NOT LOGGED IN */
           <Route path="*" element={<Navigate to="/login" replace />} />
         )}
       </Routes>

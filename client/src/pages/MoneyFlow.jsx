@@ -8,10 +8,9 @@ import {
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { useDisclosure } from "@mantine/hooks";
-import axios from "axios";
+import API from "../api/axios";
 
-// Connected directly to your local Node/Express + MongoDB backend
-const API_BASE_URL = "/api/orders";
+const API_BASE_URL = "/orders";
 
 export function MoneyFlow() {
   const navigate = useNavigate();
@@ -22,10 +21,6 @@ export function MoneyFlow() {
   const [orders, setOrders] = useState([]);
   const [globalLoading, setGlobalLoading] = useState(false);
   const [search, setSearch] = useState("");
-
-  // Safely extract the logged-in artisan's MongoDB ID
-  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-  const artisanId = userInfo?.user?._id || userInfo?.id || "anonymous_artisan";
 
   // Form State: Add New Order
   const [newOrder, setNewOrder] = useState({
@@ -43,9 +38,7 @@ export function MoneyFlow() {
   const fetchOrdersFromDb = useCallback(async () => {
     try {
       setGlobalLoading(true);
-      const response = await axios.get(API_BASE_URL, {
-        params: { artisanId }
-      });
+      const response = await API.get(API_BASE_URL);
       if (Array.isArray(response.data)) {
         setOrders(response.data);
       }
@@ -54,7 +47,7 @@ export function MoneyFlow() {
     } finally {
       setGlobalLoading(false);
     }
-  }, [artisanId]);
+  }, []);
 
   // Hook lifecycle mount
   useEffect(() => {
@@ -69,7 +62,6 @@ export function MoneyFlow() {
     }
 
     const payload = {
-      artisanId,
       name: newOrder.name,
       contact: newOrder.contact || "No Contact",
       product: newOrder.product,
@@ -79,7 +71,7 @@ export function MoneyFlow() {
 
     try {
       setGlobalLoading(true);
-      const response = await axios.post(API_BASE_URL, payload);
+      const response = await API.post(API_BASE_URL, payload);
       
       // MongoDB natively returns the newly written document object containing its generated _id
       const savedItem = response.data;
@@ -117,7 +109,7 @@ export function MoneyFlow() {
 
     try {
       setGlobalLoading(true);
-      await axios.put(`${API_BASE_URL}/${targetId}`, updatePayload);
+      await API.put(`${API_BASE_URL}/${targetId}`, updatePayload);
 
       // Instantly synchronize the frontend array to mirror back-end values cleanly
       setOrders(orders.map(order => {

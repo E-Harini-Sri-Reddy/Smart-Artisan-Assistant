@@ -17,6 +17,8 @@ import settingsRoutes from "./routes/settingsRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
+import organizationRoutes from "./routes/organizationRoutes.js";
+import productRoutes from "./routes/productRoutes.js";
 
 // Middleware Imports
 import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
@@ -24,8 +26,10 @@ import { notFound, errorHandler } from "./middlewares/errorMiddleware.js";
 // Load environment variables
 dotenv.config();
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB (skipped in test — tests manage their own connection)
+if (process.env.NODE_ENV !== "test") {
+  connectDB();
+}
 
 const app = express();
 
@@ -78,15 +82,15 @@ app.use("/api/settings", settingsRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/inventory", inventoryRoutes);
+app.use("/api/organizations", organizationRoutes);
+app.use("/api/products", productRoutes);
 
 // 6. SPA FALLBACK ROUTING
 if (process.env.NODE_ENV === "production" || process.env.PORT) {
-  // FIXED: Changed '*' to '*path' to support Express 5 / path-to-regexp parsing safely
   app.get("*path", (req, res) => {
     res.sendFile(path.join(__dirname, "../client/dist", "index.html"));
   });
 } else {
-  // Fallback Root Route for local development API testing
   app.get("/", (req, res) => {
     res.send("Smart Artisan Assistant API is Running in development mode...");
   });
@@ -98,12 +102,16 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-// 8. START SERVER
-app.listen(PORT, () => {
-  if (!process.env.GOOGLE_CLIENT_ID) {
-    console.warn("⚠️ WARNING: GOOGLE_CLIENT_ID is not defined in .env file!");
-  }
-  console.log(
-    `Server running in ${process.env.NODE_ENV || "production"} mode on port ${PORT}`,
-  );
-});
+// Export app for tests; only listen when run directly
+export { app };
+
+if (process.env.NODE_ENV !== "test") {
+  app.listen(PORT, () => {
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      console.warn("⚠️ WARNING: GOOGLE_CLIENT_ID is not defined in .env file!");
+    }
+    console.log(
+      `Server running in ${process.env.NODE_ENV || "production"} mode on port ${PORT}`,
+    );
+  });
+}

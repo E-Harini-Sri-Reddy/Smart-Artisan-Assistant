@@ -19,11 +19,7 @@ const paymentSchema = mongoose.Schema(
 
     status: {
       type: String,
-      enum: [
-        "Completed",
-        "Pending",
-        "Failed",
-      ],
+      enum: ["Completed", "Pending", "Failed"],
       required: true,
     },
 
@@ -40,17 +36,22 @@ const paymentSchema = mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      required: true,
+      index: true,
+    },
+
+    organization: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Organization",
+      default: null,
+      index: true,
     },
   },
-
   {
     timestamps: true,
-  }
+  },
 );
 
-const Payment = mongoose.model(
-  "Payment",
-  paymentSchema
-);
+const Payment = mongoose.model("Payment", paymentSchema);
 
 export default Payment;

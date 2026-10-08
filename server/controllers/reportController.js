@@ -1,8 +1,15 @@
 import Payment from "../models/Payment.js";
+import { organizationResourceFilter } from "../utils/tenantScope.js";
 
 export const getReports = async (req, res) => {
   try {
-    const payments = await Payment.find();
+    if (!req.auth?.isOrgAdmin || !req.auth.organizationId) {
+      return res
+        .status(403)
+        .json({ message: "Organization admin access required" });
+    }
+
+    const payments = await Payment.find(organizationResourceFilter(req.auth));
 
     const totalEarnings = payments.reduce(
       (acc, item) => acc + (item.amount || 0),
@@ -15,18 +22,8 @@ export const getReports = async (req, res) => {
 
     const weekLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const monthLabels = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ];
 
     const weekMap = {};
@@ -34,13 +31,13 @@ export const getReports = async (req, res) => {
     const yearMap = {};
 
     payments.forEach((p) => {
-      const d = new Date(p.paymentDate); // ✅ FIXED
+      const d = new Date(p.paymentDate);
 
       const day = weekLabels[d.getDay()];
-      weekMap[day] = (weekMap[day] || 0) + (p.amount || 0); // ✅ FIXED
+      weekMap[day] = (weekMap[day] || 0) + (p.amount || 0);
 
       const month = monthLabels[d.getMonth()];
-      monthMap[month] = (monthMap[month] || 0) + (p.amount || 0); // ✅ FIXED
+      monthMap[month] = (monthMap[month] || 0) + (p.amount || 0);
 
       const year = d.getFullYear();
       yearMap[year] = (yearMap[year] || 0) + (p.amount || 0);

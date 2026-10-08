@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   Container, Title, Text, Paper, Stack, Group, 
   ActionIcon, SimpleGrid, ThemeIcon, Progress, SegmentedControl, Box, LoadingOverlay
@@ -7,9 +7,9 @@ import {
   IconArrowLeft, IconTrendingUp, IconCash, IconPackage, IconCalendarStats, IconChartBar 
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import API from "../api/axios";
 
-const API_BASE_URL = "/api/reports";
+const API_BASE_URL = "/orders";
 
 export function AnalyticsPage() {
   const navigate = useNavigate();
@@ -25,24 +25,39 @@ export function AnalyticsPage() {
     topProducts: []
   });
 
-  // Extract logged-in artisan context
-  const userInfo = JSON.parse(localStorage.getItem("userInfo"));
-  const artisanId = userInfo?.user?._id || userInfo?.id || "anonymous_artisan";
-
-  // Fetch performance report from server
+  // Fetch performance from authenticated orders (tenant-isolated)
   const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/insights`, {
-        params: { artisanId, timeframe }
+      const response = await API.get(API_BASE_URL);
+      const orders = Array.isArray(response.data) ? response.data : [];
+      const delivered = orders.filter((o) => o.delivered === "Yes");
+      const productMap = {};
+      delivered.forEach((o) => {
+        productMap[o.product] = (productMap[o.product] || 0) + 1;
       });
-      setAnalytics(response.data);
+      const topProducts = Object.entries(productMap)
+        .map(([name, count]) => ({ name, count, progress: 0 }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+      const max = Math.max(...topProducts.map((p) => p.count), 1);
+      topProducts.forEach((p) => {
+        p.progress = Math.round((p.count / max) * 100);
+      });
+
+      setAnalytics({
+        revenue: delivered.length,
+        soldCount: delivered.length,
+        growth: timeframe,
+        progress: Math.min(100, delivered.length * 10),
+        topProducts,
+      });
     } catch (error) {
       console.error("Error connecting to insights server:", error);
     } finally {
       setLoading(false);
     }
-  }, [artisanId, timeframe]);
+  }, [timeframe]);
 
   useEffect(() => {
     fetchAnalytics();

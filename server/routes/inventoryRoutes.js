@@ -1,27 +1,41 @@
 import express from "express";
 import mongoose from "mongoose";
-import Inventory from "../models/Inventory.js"; // Importing the newly created layout model
+import Inventory from "../models/Inventory.js";
+import { protect, requireArtisanAccess } from "../middlewares/authMiddleware.js";
+import { personalResourceFilter } from "../utils/tenantScope.js";
 
 const router = express.Router();
 
-// 1. GET: Fetch user-scoped items
+router.use(protect, requireArtisanAccess);
+
+// 1. GET: Fetch owner-scoped items (ignore client artisanId)
 router.get("/", async (req, res, next) => {
   try {
-    const { artisanId } = req.query;
-    if (!artisanId) {
-      return res.status(400).json({ message: "Missing artisanId query parameter" });
-    }
-    const items = await Inventory.find({ artisanId }).sort({ createdAt: -1 });
+    const items = await Inventory.find(personalResourceFilter(req.auth)).sort({
+      createdAt: -1,
+    });
     return res.json(items);
   } catch (error) {
     next(error);
   }
 });
 
-// 2. POST: Insert a brand new record
+// 2. POST: Insert a brand new record owned by authenticated user
 router.post("/", async (req, res, next) => {
   try {
-    const newItem = new Inventory(req.body);
+    const { name, itemType, stock, maxStock, unit, price } = req.body;
+
+    const newItem = new Inventory({
+      name,
+      itemType,
+      stock,
+      maxStock,
+      unit,
+      price,
+      ownerUser: req.auth.userId,
+      artisanId: String(req.auth.userId),
+      organization: req.auth.organizationId || null,
+    });
     const savedItem = await newItem.save();
     return res.status(201).json(savedItem);
   } catch (error) {
@@ -29,23 +43,29 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-// 3. PUT: Direct inline rapid stock increments/decrements ($inc)
+// 3. PUT: stock increments/decrements
 router.put("/:id/stock", async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { amount } = req.body; // Expects 1 or -1
+    const { amount } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid MongoDB Object ID configuration" });
+      return res
+        .status(400)
+        .json({ message: "Invalid MongoDB Object ID configuration" });
     }
 
-    const updatedItem = await Inventory.findByIdAndUpdate(
-      id,
+    const updatedItem = await Inventory.findOneAndUpdate(
+      { _id: id, ...personalResourceFilter(req.auth) },
       { $inc: { stock: amount } },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true },
     );
 
-    if (updatedItem && updatedItem.stock < 0) {
+    if (!updatedItem) {
+      return res.status(404).json({ message: "Target inventory row not found" });
+    }
+
+    if (updatedItem.stock < 0) {
       updatedItem.stock = 0;
       await updatedItem.save();
     }
@@ -56,18 +76,29 @@ router.put("/:id/stock", async (req, res, next) => {
   }
 });
 
-// 4. PUT: General attribute edits (names, prices, max capacities)
+// 4. PUT: General attribute edits
 router.put("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid MongoDB Object ID configuration" });
+      return res
+        .status(400)
+        .json({ message: "Invalid MongoDB Object ID configuration" });
     }
 
-    const updatedItem = await Inventory.findByIdAndUpdate(
-      id,
-      { $set: req.body },
-      { new: true, runValidators: true }
+    const { name, itemType, stock, maxStock, unit, price } = req.body;
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (itemType !== undefined) updates.itemType = itemType;
+    if (stock !== undefined) updates.stock = stock;
+    if (maxStock !== undefined) updates.maxStock = maxStock;
+    if (unit !== undefined) updates.unit = unit;
+    if (price !== undefined) updates.price = price;
+
+    const updatedItem = await Inventory.findOneAndUpdate(
+      { _id: id, ...personalResourceFilter(req.auth) },
+      { $set: updates },
+      { returnDocument: "after", runValidators: true },
     );
 
     if (!updatedItem) {
@@ -80,20 +111,28 @@ router.put("/:id", async (req, res, next) => {
   }
 });
 
-// 5. DELETE: Drop a document permanently
+// 5. DELETE
 router.delete("/:id", async (req, res, next) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid MongoDB Object ID configuration" });
+      return res
+        .status(400)
+        .json({ message: "Invalid MongoDB Object ID configuration" });
     }
 
-    const droppedItem = await Inventory.findByIdAndDelete(id);
+    const droppedItem = await Inventory.findOneAndDelete({
+      _id: id,
+      ...personalResourceFilter(req.auth),
+    });
     if (!droppedItem) {
       return res.status(404).json({ message: "Target document doesn't exist" });
     }
 
-    return res.json({ success: true, message: "Inventory record wiped successfully" });
+    return res.json({
+      success: true,
+      message: "Inventory record wiped successfully",
+    });
   } catch (error) {
     next(error);
   }

@@ -2,18 +2,24 @@ import express from "express";
 import {
   registerUser,
   loginUser,
-  googleAuth, // Add this import
+  googleAuth,
+  logoutUser,
+  forgotPassword,
+  resetPassword,
+  changePassword,
+  getMe,
 } from "../controllers/authController.js";
+import { protect } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// Manual Registration
 router.post("/register", registerUser);
-
-// Manual Login
 router.post("/login", loginUser);
-
-// Google Authentication (Signup & Login)
 router.post("/google", googleAuth);
+router.post("/logout", protect, logoutUser);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password/:token", resetPassword);
+router.put("/change-password", protect, changePassword);
+router.get("/me", protect, getMe);
 
 export default router;

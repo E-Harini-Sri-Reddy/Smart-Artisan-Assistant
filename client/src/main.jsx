@@ -12,11 +12,17 @@ const theme = createTheme({
   primaryColor: 'blue', // Or the brown/earthy tone from your UI
 });
 
-const GOOGLE_CLIENT_ID = "536895736885-l5th17umc2m8uo4nr2n5nslcajq27s1d.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+if (!GOOGLE_CLIENT_ID) {
+  console.warn(
+    "VITE_GOOGLE_CLIENT_ID is not set. Google sign-in will not work until it is added to the client .env file.",
+  );
+}
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID || ""}>
       <MantineProvider theme={theme} defaultColorScheme="light">
         <App />
       </MantineProvider>
