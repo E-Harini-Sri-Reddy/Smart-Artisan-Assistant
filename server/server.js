@@ -68,6 +68,9 @@ if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
+// Uploaded assignment attachments / completion photos
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 // 4. SERVE FRONTEND STATIC ASSETS FIRST (For Production Environments)
 if (process.env.NODE_ENV === "production" || process.env.PORT) {
   app.use(express.static(path.join(__dirname, "../client/dist")));

@@ -17,20 +17,33 @@ import {
   IconPackage, 
   IconStars, 
   IconChartBar, 
-  IconSettings 
+  IconSettings,
+  IconClipboardList,
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
+import { getStoredUser } from "../utils/authStorage";
 
 export function ArtisanDashboard() {
   const navigate = useNavigate();
+  const user = getStoredUser();
+  const isOrgArtisan = Boolean(user?.organizationId);
 
   const handleLogout = () => {
     localStorage.removeItem("userInfo");
     window.location.reload(); 
   };
 
-  // CLEANED LIST: Removed Customers and Messages
   const actions = [
+    ...(isOrgArtisan
+      ? [
+          {
+            label: "Assignments",
+            icon: <IconClipboardList size="2rem" />,
+            path: "/assignments",
+            color: "orange",
+          },
+        ]
+      : []),
     { label: "Money Flow", icon: <IconCashBanknote size="2rem" />, path: "/money-flow", color: "green" },
     { label: "Price Analyser", icon: <IconScan size="2rem" />, path: "/price-analyser", color: "blue" },
     { label: "Inventory", icon: <IconPackage size="2rem" />, path: "/inventory", color: "orange" },

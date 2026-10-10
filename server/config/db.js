@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { ensureAssignmentIndexes } from "../utils/ensureIndexes.js";
 
 const connectDB = async () => {
   try {
@@ -9,6 +10,7 @@ const connectDB = async () => {
     const conn = await mongoose.connect(process.env.MONGO_URI);
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
+    await ensureAssignmentIndexes();
     return conn;
   } catch (error) {
     console.error(`Error: ${error.message}`);

@@ -218,43 +218,81 @@ describe("Tenant isolation & product assignment", () => {
       .send({ name: "Product B" });
     assert.equal(productB.status, 201);
 
+    const due = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     const ok = await request(app)
       .post("/api/products/assignments")
       .set("Authorization", `Bearer ${orgA.token}`)
-      .send({
-        productId: productA.body._id,
-        userId: userALogin.body._id,
-      });
+      .field("productId", productA.body._id)
+      .field("userId", userALogin.body._id)
+      .field("assignmentType", "Customization")
+      .field("priority", "High")
+      .field("offeredPay", "1500")
+      .field("dueDate", due)
+      .field("notes", "Finish carefully");
     assert.equal(ok.status, 201);
+    assert.ok(ok.body.assignmentNumber);
+    assert.equal(ok.body.status, "Assigned");
+    assert.equal(ok.body.offeredPay, 1500);
+
+    // Same product + artisan can receive another assignment
+    const ok2 = await request(app)
+      .post("/api/products/assignments")
+      .set("Authorization", `Bearer ${orgA.token}`)
+      .field("productId", productA.body._id)
+      .field("userId", userALogin.body._id)
+      .field("assignmentType", "Repair")
+      .field("priority", "Medium")
+      .field("offeredPay", "800")
+      .field("dueDate", due)
+      .field("notes", "Second job on same product");
+    assert.equal(ok2.status, 201);
+    assert.notEqual(ok2.body._id, ok.body._id);
+
+    // Missing offered pay fails
+    const noPay = await request(app)
+      .post("/api/products/assignments")
+      .set("Authorization", `Bearer ${orgA.token}`)
+      .field("productId", productA.body._id)
+      .field("userId", userALogin.body._id)
+      .field("assignmentType", "Repair")
+      .field("dueDate", due)
+      .field("notes", "x");
+    assert.equal(noPay.status, 400);
 
     // Cross-org: Org A product to Org B admin user
     const cross = await request(app)
       .post("/api/products/assignments")
       .set("Authorization", `Bearer ${orgA.token}`)
-      .send({
-        productId: productA.body._id,
-        userId: orgB._id,
-      });
+      .field("productId", productA.body._id)
+      .field("userId", orgB._id)
+      .field("assignmentType", "Repair")
+      .field("offeredPay", "100")
+      .field("dueDate", due)
+      .field("notes", "x");
     assert.equal(cross.status, 400);
 
     // Org B product assigned using Org A admin (product not in org)
     const crossProduct = await request(app)
       .post("/api/products/assignments")
       .set("Authorization", `Bearer ${orgA.token}`)
-      .send({
-        productId: productB.body._id,
-        userId: userALogin.body._id,
-      });
+      .field("productId", productB.body._id)
+      .field("userId", userALogin.body._id)
+      .field("assignmentType", "Repair")
+      .field("offeredPay", "100")
+      .field("dueDate", due)
+      .field("notes", "x");
     assert.equal(crossProduct.status, 404);
 
     // Org user cannot assign
     const userAssign = await request(app)
       .post("/api/products/assignments")
       .set("Authorization", `Bearer ${userALogin.body.token}`)
-      .send({
-        productId: productA.body._id,
-        userId: userALogin.body._id,
-      });
+      .field("productId", productA.body._id)
+      .field("userId", userALogin.body._id)
+      .field("assignmentType", "Repair")
+      .field("offeredPay", "100")
+      .field("dueDate", due)
+      .field("notes", "x");
     assert.equal(userAssign.status, 403);
 
     // Individual artisan cannot receive org assignment via wrong org membership check
@@ -262,11 +300,76 @@ describe("Tenant isolation & product assignment", () => {
     const soloAssign = await request(app)
       .post("/api/products/assignments")
       .set("Authorization", `Bearer ${orgA.token}`)
-      .send({
-        productId: productA.body._id,
-        userId: solo._id,
-      });
+      .field("productId", productA.body._id)
+      .field("userId", solo._id)
+      .field("assignmentType", "Repair")
+      .field("offeredPay", "100")
+      .field("dueDate", due)
+      .field("notes", "x");
     assert.equal(soloAssign.status, 400);
+
+    // Artisan can negotiate pay before accepting
+    const negotiate = await request(app)
+      .post(`/api/products/assignments/${ok.body._id}/negotiate`)
+      .set("Authorization", `Bearer ${userALogin.body.token}`)
+      .send({
+        message: "This feels low for the scope",
+        proposedPay: 2000,
+      });
+    assert.equal(negotiate.status, 200);
+    assert.equal(negotiate.body.status, "Assigned");
+    assert.ok(
+      negotiate.body.priceMessages.some(
+        (m) => m.role === "artisan" && m.proposedPay === 2000,
+      ),
+    );
+
+    const reply = await request(app)
+      .post(`/api/products/assignments/${ok.body._id}/price-reply`)
+      .set("Authorization", `Bearer ${orgA.token}`)
+      .send({
+        message: "We can do 1800",
+        offeredPay: 1800,
+      });
+    assert.equal(reply.status, 200);
+    assert.equal(reply.body.offeredPay, 1800);
+
+    // Artisan workflow: accept → start
+    const mine = await request(app)
+      .get("/api/products/assignments/mine")
+      .set("Authorization", `Bearer ${userALogin.body.token}`);
+    assert.equal(mine.status, 200);
+    assert.equal(mine.body.length, 2);
+
+    const accept = await request(app)
+      .post(`/api/products/assignments/${ok.body._id}/accept`)
+      .set("Authorization", `Bearer ${userALogin.body.token}`)
+      .send({
+        startDate: new Date().toISOString(),
+        estimatedCompletionDate: new Date(
+          Date.now() + 2 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+      });
+    assert.equal(accept.status, 200);
+    assert.equal(accept.body.status, "Accepted");
+    assert.ok(accept.body.startDate);
+    assert.ok(accept.body.estimatedCompletionDate);
+    assert.equal(accept.body.offeredPay, 1800);
+
+    const start = await request(app)
+      .post(`/api/products/assignments/${ok.body._id}/start`)
+      .set("Authorization", `Bearer ${userALogin.body.token}`);
+    assert.equal(start.status, 200);
+    assert.equal(start.body.status, "In Progress");
+
+    // Reject flow on second assignment
+    const reject = await request(app)
+      .post(`/api/products/assignments/${ok2.body._id}/reject`)
+      .set("Authorization", `Bearer ${userALogin.body.token}`)
+      .send({ reason: "Schedule conflict this week" });
+    assert.equal(reject.status, 200);
+    assert.equal(reject.body.status, "Rejected");
+    assert.equal(reject.body.rejectionReason, "Schedule conflict this week");
   });
 
   it("org user cannot access other org members/settings rename", async () => {

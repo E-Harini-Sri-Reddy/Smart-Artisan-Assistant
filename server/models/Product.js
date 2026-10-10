@@ -22,6 +22,16 @@ const productSchema = new mongoose.Schema(
       default: "pcs",
       trim: true,
     },
+    unitCategory: {
+      type: String,
+      enum: ["count", "weight", "liquid", "length"],
+      default: "count",
+    },
+    image: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     organization: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Organization",

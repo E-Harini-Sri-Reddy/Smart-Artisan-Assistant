@@ -1,595 +1,440 @@
-import React, { useEffect, useState } from "react";
-
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Button,
-  Card,
   Group,
+  Modal,
+  NumberInput,
   Paper,
-  Progress,
+  SegmentedControl,
+  Select,
   SimpleGrid,
+  Stack,
   Table,
   Text,
-  Title,
-  Menu,
-  Modal,
-  TextInput,
-  Select,
   Textarea,
-  Loader,
-  Center,
-  ActionIcon,
+  Title,
 } from "@mantine/core";
-
-import { DateInput } from "@mantine/dates";
-
-import { useForm } from "@mantine/form";
-
-import "@mantine/dates/styles.css";
-
-import {
-  IndianRupee,
-  Wallet,
-  CreditCard,
-  TrendingUp,
-  MoreVertical,
-  Pencil,
-  Trash2,
-} from "lucide-react";
-
 import API from "../api/axios";
-
 import classes from "./PaymentsPage.module.css";
 
+const formatPay = (amount) =>
+  `₹${Number(amount || 0).toLocaleString("en-IN")}`;
+
+const statusColor = (status) => {
+  switch (status) {
+    case "Received":
+      return "green";
+    case "Awaiting Confirmation":
+      return "orange";
+    case "Pending":
+      return "yellow";
+    default:
+      return "gray";
+  }
+};
+
 export const PaymentsPage = () => {
-  const [filter, setFilter] = useState("All");
-
-  const [opened, setOpened] = useState(false);
-
-  const [transactions, setTransactions] = useState([]);
-
+  const [payments, setPayments] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
-
-  const [editOpened, setEditOpened] = useState(false);
-
+  const [sendOpen, setSendOpen] = useState(false);
+  const [approveOpen, setApproveOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [sendForm, setSendForm] = useState({
+    assignmentId: null,
+    type: "advance",
+    amount: null,
+    note: "",
+  });
+  const [approveAmount, setApproveAmount] = useState(null);
+  const [approveNote, setApproveNote] = useState("");
 
-  const [editCustomer, setEditCustomer] = useState("");
-
-  const [editProduct, setEditProduct] = useState("");
-
-  const [editAmount, setEditAmount] = useState("");
-
-  const [editStatus, setEditStatus] = useState("");
-
-  const [editDate, setEditDate] = useState(null);
-
-  const [editNotes, setEditNotes] = useState("");
-
-  /* FETCH PAYMENTS */
-
-  const fetchPayments = async () => {
+  const load = useCallback(async () => {
     try {
-      const { data } = await API.get("/payments");
-
-      setTransactions(data);
-    } catch (error) {
-      console.error(error);
+      setLoading(true);
+      const [payRes, assignRes] = await Promise.all([
+        API.get("/products/assignments/payments/list"),
+        API.get("/products/assignments/list"),
+      ]);
+      setPayments(Array.isArray(payRes.data) ? payRes.data : []);
+      setAssignments(Array.isArray(assignRes.data) ? assignRes.data : []);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchPayments();
   }, []);
 
-  /* FORM */
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const form = useForm({
-    initialValues: {
-      customer: "",
-      product: "",
-      amount: "",
-      status: "",
-      date: null,
-      notes: "",
-    },
+  const filtered = useMemo(() => {
+    if (filter === "all") return payments;
+    return payments.filter((p) => p.status === filter);
+  }, [payments, filter]);
 
-    validate: {
-      customer: (v) => (v.trim().length ? null : "Customer name is required"),
+  const stats = useMemo(() => {
+    const received = payments.filter((p) => p.status === "Received");
+    const paid = received.reduce((s, p) => s + Number(p.amount || 0), 0);
+    const awaiting = payments
+      .filter((p) => p.status === "Awaiting Confirmation")
+      .reduce((s, p) => s + Number(p.amount || 0), 0);
+    const pending = payments
+      .filter((p) => p.status === "Pending")
+      .reduce((s, p) => s + Number(p.amount || 0), 0);
+    return {
+      paid,
+      awaiting,
+      pending,
+      count: payments.length,
+    };
+  }, [payments]);
 
-      product: (v) => (v.trim().length ? null : "Product is required"),
-
-      amount: (v) =>
-        v && !isNaN(Number(v)) ? null : "Valid amount is required",
-
-      status: (v) => (v ? null : "Payment status is required"),
-
-      date: (v) => (v ? null : "Payment date is required"),
-    },
-  });
-
-  /* SAVE PAYMENT */
-
-  const handleSave = async () => {
-    const result = form.validate();
-
-    if (result.hasErrors) return;
-
-    try {
-      await API.post("/payments", {
-        customer: form.values.customer,
-
-        product: form.values.product,
-
-        amount: Number(form.values.amount),
-
-        status: form.values.status,
-
-        paymentDate: form.values.date,
-
-        notes: form.values.notes,
-      });
-
-      await fetchPayments();
-
-      setOpened(false);
-
-      form.reset();
-    } catch (error) {
-      console.error(error);
-
-      alert("Failed to save payment");
-    }
-  };
-
-  /* DELETE PAYMENT */
-
-  const handleDelete = async (id) => {
-    const confirmDelete = window.confirm("Delete this payment?");
-
-    if (!confirmDelete) return;
-
-    try {
-      await API.delete(`/payments/${id}`);
-
-      fetchPayments();
-    } catch (error) {
-      console.error(error);
-
-      alert("Delete failed");
-    }
-  };
-
-  /* EDIT PAYMENT */
-
-  const handleEditSave = async () => {
-    try {
-      await API.put(`/payments/${selectedPayment._id}`, {
-        customer: editCustomer,
-        product: editProduct,
-        amount: Number(editAmount),
-        status: editStatus,
-        paymentDate: editDate,
-        notes: editNotes,
-      });
-
-      fetchPayments();
-
-      setEditOpened(false);
-    } catch (error) {
-      console.error(error);
-
-      alert("Update failed");
-    }
-  };
-
-  /* FILTER */
-
-  const filteredTransactions =
-    filter === "All"
-      ? transactions
-      : transactions.filter((item) => item.status === filter);
-
-  /* STATS */
-
-  const totalRevenue = transactions.reduce(
-    (acc, item) => (item.status === "Completed" ? acc + item.amount : acc),
-    0,
+  const assignmentOptions = useMemo(
+    () =>
+      assignments
+        .filter(
+          (a) =>
+            !["Cancelled", "Rejected", "Assigned"].includes(a.status),
+        )
+        .map((a) => ({
+          value: a._id,
+          label: `${a.assignmentNumber} · ${a.product?.name || "Product"} · ${a.user?.name || "Artisan"}`,
+        })),
+    [assignments],
   );
 
-  const pendingPayments = transactions.reduce(
-    (acc, item) => (item.status === "Pending" ? acc + item.amount : acc),
-    0,
-  );
+  const openSend = () => {
+    setSendForm({
+      assignmentId: null,
+      type: "advance",
+      amount: null,
+      note: "",
+    });
+    setSendOpen(true);
+  };
 
-  const completedPayments = transactions.filter(
-    (item) => item.status === "Completed",
-  ).length;
+  const handleSend = async () => {
+    if (!sendForm.assignmentId) {
+      alert("Select an assignment");
+      return;
+    }
+    if (!sendForm.amount || Number(sendForm.amount) <= 0) {
+      alert("Enter a valid amount");
+      return;
+    }
+    setSaving(true);
+    try {
+      await API.post(`/products/assignments/${sendForm.assignmentId}/payments`, {
+        type: sendForm.type,
+        amount: sendForm.amount,
+        note: sendForm.note,
+      });
+      setSendOpen(false);
+      await load();
+    } catch (err) {
+      alert(err.response?.data?.message || "Could not record payment");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  const successRate =
-    transactions.length > 0
-      ? Math.round((completedPayments / transactions.length) * 100)
-      : 0;
+  const openApprove = (payment) => {
+    setSelectedPayment(payment);
+    setApproveAmount(payment.amount);
+    setApproveNote(payment.note || "");
+    setApproveOpen(true);
+  };
 
-  /* TABLE ROWS */
+  const handleApprove = async () => {
+    if (!selectedPayment) return;
+    setSaving(true);
+    try {
+      await API.post(
+        `/products/assignments/payments/${selectedPayment._id}/approve`,
+        {
+          amount: approveAmount,
+          note: approveNote,
+        },
+      );
+      setApproveOpen(false);
+      setSelectedPayment(null);
+      await load();
+    } catch (err) {
+      alert(err.response?.data?.message || "Could not approve payment");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  const rows = filteredTransactions.map((item) => (
-    <Table.Tr key={item._id}>
-      <Table.Td>{item.customer}</Table.Td>
+  const confirmDelivery = async (assignmentId) => {
+    try {
+      await API.post(
+        `/products/assignments/${assignmentId}/confirm-delivery`,
+      );
+      await load();
+    } catch (err) {
+      alert(err.response?.data?.message || "Could not confirm delivery");
+    }
+  };
 
-      <Table.Td>{item.product}</Table.Td>
-
-      <Table.Td fw={600}>₹{item.amount}</Table.Td>
-
-      <Table.Td>
-        <Badge
-          variant="light"
-          color={
-            item.status === "Completed"
-              ? "green"
-              : item.status === "Pending"
-                ? "yellow"
-                : "red"
-          }
-        >
-          {item.status}
-        </Badge>
-      </Table.Td>
-
-      <Table.Td>{new Date(item.paymentDate).toLocaleDateString()}</Table.Td>
-
-      <Table.Td>
-        <Menu shadow="md" width={180}>
-          <Menu.Target>
-            <ActionIcon variant="subtle" color="gray">
-              <MoreVertical size={16} />
-            </ActionIcon>
-          </Menu.Target>
-
-          <Menu.Dropdown>
-            <Menu.Item
-              leftSection={<Pencil size={16} />}
-              onClick={() => {
-                setSelectedPayment(item);
-
-                setEditCustomer(item.customer);
-
-                setEditProduct(item.product);
-
-                setEditAmount(item.amount);
-
-                setEditStatus(item.status);
-
-                setEditDate(new Date(item.paymentDate));
-
-                setEditNotes(item.notes || "");
-
-                setEditOpened(true);
-              }}
-            >
-              Edit
-            </Menu.Item>
-
-            <Menu.Item
-              color="red"
-              leftSection={<Trash2 size={16} />}
-              onClick={() => handleDelete(item._id)}
-            >
-              Delete
-            </Menu.Item>
-          </Menu.Dropdown>
-        </Menu>
-      </Table.Td>
-    </Table.Tr>
-  ));
-
-  if (loading) {
-    return (
-      <Center h="70vh">
-        <Loader color="#9c6238" size="lg" />
-      </Center>
-    );
-  }
+  const inTransit = assignments.filter((a) => a.status === "In Transit");
 
   return (
     <div className={classes.page}>
-      {/* HEADER */}
-
       <div className={classes.header}>
         <div>
           <Title order={2}>Payments</Title>
-
           <Text c="dimmed" mt={4}>
-            Track and manage your payments.
+            Track advances and final payments to artisans. Awaiting confirmation
+            means you marked it sent — waiting for the artisan to confirm
+            receipt.
           </Text>
         </div>
-
-        <Button onClick={() => setOpened(true)} color="#9c6238">
-          + Add Payment
+        <Button color="#9c6238" onClick={openSend}>
+          Record payment
         </Button>
       </div>
 
-      {/* STATS */}
-
-      <SimpleGrid
-        cols={{
-          base: 1,
-          sm: 2,
-          lg: 4,
-        }}
-        spacing="lg"
-        mt="xl"
-      >
-        <Paper withBorder radius="lg" p="lg" className={classes.statCard}>
-          <Group justify="space-between">
-            <div>
-              <Text size="sm" c="dimmed">
-                Total Revenue
-              </Text>
-
-              <Title order={3} mt={6}>
-                ₹{totalRevenue}
-              </Title>
-            </div>
-
-            <div className={classes.iconWrapper}>
-              <IndianRupee size={28} />
-            </div>
-          </Group>
+      <SimpleGrid cols={{ base: 1, sm: 3 }} mb="xl" mt="lg">
+        <Paper withBorder radius="lg" p="md" className={classes.statCard}>
+          <Text size="sm" c="dimmed">
+            Paid (confirmed)
+          </Text>
+          <Text fw={700} size="xl">
+            {formatPay(stats.paid)}
+          </Text>
         </Paper>
-
-        <Paper withBorder radius="lg" p="lg" className={classes.statCard}>
-          <Group justify="space-between">
-            <div>
-              <Text size="sm" c="dimmed">
-                Pending Payments
-              </Text>
-
-              <Title order={3} mt={6}>
-                ₹{pendingPayments}
-              </Title>
-            </div>
-
-            <div className={classes.iconWrapper}>
-              <Wallet size={28} />
-            </div>
-          </Group>
+        <Paper withBorder radius="lg" p="md" className={classes.statCard}>
+          <Text size="sm" c="dimmed">
+            Awaiting confirmation
+          </Text>
+          <Text fw={700} size="xl">
+            {formatPay(stats.awaiting)}
+          </Text>
         </Paper>
-
-        <Paper withBorder radius="lg" p="lg" className={classes.statCard}>
-          <Group justify="space-between">
-            <div>
-              <Text size="sm" c="dimmed">
-                Success Rate
-              </Text>
-
-              <Title order={3} mt={6}>
-                {successRate}%
-              </Title>
-            </div>
-
-            <div className={classes.iconWrapper}>
-              <CreditCard size={28} />
-            </div>
-          </Group>
-
-          <Progress value={successRate} color="#9c6238" mt="lg" />
-        </Paper>
-
-        <Paper withBorder radius="lg" p="lg" className={classes.statCard}>
-          <Group justify="space-between">
-            <div>
-              <Text size="sm" c="dimmed">
-                Total Transactions
-              </Text>
-
-              <Title order={3} mt={6}>
-                {transactions.length}
-              </Title>
-            </div>
-
-            <div className={classes.iconWrapper}>
-              <TrendingUp size={28} />
-            </div>
-          </Group>
+        <Paper withBorder radius="lg" p="md" className={classes.statCard}>
+          <Text size="sm" c="dimmed">
+            Pending requests
+          </Text>
+          <Text fw={700} size="xl">
+            {formatPay(stats.pending)}
+          </Text>
         </Paper>
       </SimpleGrid>
 
-      {/* TABLE */}
+      {inTransit.length > 0 && (
+        <Paper withBorder radius="xl" p="lg" mb="xl">
+          <Text fw={700} mb="sm">
+            Products in transit — confirm receipt
+          </Text>
+          <Stack gap="sm">
+            {inTransit.map((a) => (
+              <Group key={a._id} justify="space-between">
+                <Stack gap={2}>
+                  <Text fw={600}>
+                    {a.product?.name} · {a.assignmentNumber}
+                  </Text>
+                  <Text size="sm" c="dimmed">
+                    From {a.user?.name} · Offer {formatPay(a.offeredPay)}
+                  </Text>
+                </Stack>
+                <Button
+                  size="sm"
+                  color="#9c6238"
+                  onClick={() => confirmDelivery(a._id)}
+                >
+                  Confirm product received
+                </Button>
+              </Group>
+            ))}
+          </Stack>
+        </Paper>
+      )}
 
-      <Card withBorder radius="xl" p="lg" mt="xl">
-        <Group mb="xl">
-          {["All", "Completed", "Pending", "Failed"].map((type) => (
-            <Button
-              key={type}
-              variant={filter === type ? "filled" : "light"}
-              color={
-                type === "Completed"
-                  ? "green"
-                  : type === "Pending"
-                    ? "yellow"
-                    : type === "Failed"
-                      ? "red"
-                      : "#9c6238"
-              }
-              onClick={() => setFilter(type)}
-            >
-              {type}
-            </Button>
-          ))}
-        </Group>
+      <SegmentedControl
+        mb="md"
+        color="#9c6238"
+        value={filter}
+        onChange={setFilter}
+        data={[
+          { label: "All", value: "all" },
+          { label: "Pending", value: "Pending" },
+          { label: "Awaiting confirmation", value: "Awaiting Confirmation" },
+          { label: "Received", value: "Received" },
+        ]}
+      />
 
-        <Table verticalSpacing="lg" horizontalSpacing="md">
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Customer</Table.Th>
-
-              <Table.Th>Product</Table.Th>
-
-              <Table.Th>Amount</Table.Th>
-
-              <Table.Th>Status</Table.Th>
-
-              <Table.Th>Payment Date</Table.Th>
-
-              <Table.Th>Actions</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-
-          <Table.Tbody>{rows}</Table.Tbody>
-        </Table>
-      </Card>
-
-      {/* ADD PAYMENT MODAL */}
+      <Paper withBorder radius="xl" p="xl">
+        {loading ? (
+          <Text c="dimmed">Loading…</Text>
+        ) : (
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Assignment</Table.Th>
+                <Table.Th>Artisan</Table.Th>
+                <Table.Th>Type</Table.Th>
+                <Table.Th>Amount</Table.Th>
+                <Table.Th>Status</Table.Th>
+                <Table.Th>Actions</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {filtered.map((p) => (
+                <Table.Tr key={p._id}>
+                  <Table.Td>
+                    <Text size="sm" fw={600}>
+                      {p.assignment?.product?.name || "Product"}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      {p.assignment?.assignmentNumber}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>{p.artisan?.name || "—"}</Table.Td>
+                  <Table.Td>
+                    {p.type === "advance" ? "Advance" : "Final"}
+                  </Table.Td>
+                  <Table.Td>{formatPay(p.amount)}</Table.Td>
+                  <Table.Td>
+                    <Badge color={statusColor(p.status)}>{p.status}</Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    {p.status === "Pending" ? (
+                      <Button
+                        size="xs"
+                        color="#9c6238"
+                        onClick={() => openApprove(p)}
+                      >
+                        Send & await confirmation
+                      </Button>
+                    ) : p.status === "Awaiting Confirmation" ? (
+                      <Text size="xs" c="dimmed">
+                        Waiting for artisan
+                      </Text>
+                    ) : (
+                      <Text size="xs" c="dimmed">
+                        Confirmed{" "}
+                        {p.confirmedAt
+                          ? new Date(p.confirmedAt).toLocaleDateString()
+                          : ""}
+                      </Text>
+                    )}
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+              {filtered.length === 0 && (
+                <Table.Tr>
+                  <Table.Td colSpan={6}>
+                    <Text c="dimmed" ta="center" py="md">
+                      No payments in this view.
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+            </Table.Tbody>
+          </Table>
+        )}
+      </Paper>
 
       <Modal
-        opened={opened}
-        onClose={() => {
-          setOpened(false);
-
-          form.reset();
-        }}
-        title="Add Payment"
+        opened={sendOpen}
+        onClose={() => setSendOpen(false)}
+        title="Record payment to artisan"
         centered
-        size="lg"
-        radius="xl"
+        radius="lg"
       >
-        <Text c="dimmed" mb="xl" size="sm">
-          Enter payment transaction details.
-        </Text>
-
-        <Group grow mb="lg">
-          <TextInput
-            label="Customer Name"
+        <Stack gap="md">
+          <Select
+            label="Assignment"
             withAsterisk
-            placeholder="Enter customer name"
-            {...form.getInputProps("customer")}
+            searchable
+            data={assignmentOptions}
+            value={sendForm.assignmentId}
+            onChange={(v) => setSendForm((f) => ({ ...f, assignmentId: v }))}
+            nothingFoundMessage="No eligible assignments"
           />
-
-          <TextInput
-            label="Product"
+          <Select
+            label="Payment type"
             withAsterisk
-            placeholder="Enter product name"
-            {...form.getInputProps("product")}
+            data={[
+              { value: "advance", label: "Advance" },
+              { value: "final", label: "Final payment" },
+            ]}
+            value={sendForm.type}
+            onChange={(v) => setSendForm((f) => ({ ...f, type: v }))}
           />
-        </Group>
-
-        <Group grow mb="lg">
-          <TextInput
+          <NumberInput
             label="Amount (₹)"
             withAsterisk
-            placeholder="Enter amount"
-            {...form.getInputProps("amount")}
+            min={0}
+            decimalScale={2}
+            thousandSeparator=","
+            prefix="₹ "
+            value={sendForm.amount}
+            onChange={(v) =>
+              setSendForm((f) => ({
+                ...f,
+                amount: v === "" || v === null ? null : Number(v),
+              }))
+            }
           />
-
-          <Select
-            label="Payment Status"
-            placeholder="Select status"
-            withAsterisk
-            data={["Completed", "Pending", "Failed"]}
-            {...form.getInputProps("status")}
+          <Textarea
+            label="Note"
+            minRows={2}
+            value={sendForm.note}
+            onChange={(e) =>
+              setSendForm((f) => ({ ...f, note: e.target.value }))
+            }
           />
-        </Group>
-
-        <DateInput
-          label="Payment Date"
-          placeholder="Select payment date"
-          withAsterisk
-          mb="lg"
-          {...form.getInputProps("date")}
-        />
-
-        <Textarea
-          label="Notes"
-          placeholder="Additional payment notes..."
-          minRows={4}
-          {...form.getInputProps("notes")}
-        />
-
-        <Group justify="flex-end" mt="xl">
-          <Button
-            variant="light"
-            color="gray"
-            onClick={() => {
-              setOpened(false);
-
-              form.reset();
-            }}
-          >
-            Cancel
+          <Text size="xs" c="dimmed">
+            This will show as “Awaiting Confirmation” until the artisan confirms
+            they received the money.
+          </Text>
+          <Button color="#9c6238" loading={saving} onClick={handleSend}>
+            Mark as sent
           </Button>
-
-          <Button color="#9c6238" onClick={handleSave}>
-            Save Payment
-          </Button>
-        </Group>
+        </Stack>
       </Modal>
 
-      {/* EDIT PAYMENT MODAL */}
-
       <Modal
-        opened={editOpened}
-        onClose={() => setEditOpened(false)}
-        title="Edit Payment"
+        opened={approveOpen}
+        onClose={() => setApproveOpen(false)}
+        title="Approve advance request"
         centered
-        size="lg"
-        radius="xl"
+        radius="lg"
       >
-        <Group grow mb="lg">
-          <TextInput
-            label="Customer Name"
-            value={editCustomer}
-            onChange={(event) => setEditCustomer(event.target.value)}
-          />
-
-          <TextInput
-            label="Product"
-            value={editProduct}
-            onChange={(event) => setEditProduct(event.target.value)}
-          />
-        </Group>
-
-        <Group grow mb="lg">
-          <TextInput
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            {selectedPayment?.artisan?.name} requested an advance for{" "}
+            {selectedPayment?.assignment?.assignmentNumber}. Mark it sent to
+            move it to awaiting confirmation.
+          </Text>
+          <NumberInput
             label="Amount (₹)"
-            value={editAmount}
-            onChange={(event) => setEditAmount(event.target.value)}
+            min={0}
+            decimalScale={2}
+            thousandSeparator=","
+            prefix="₹ "
+            value={approveAmount}
+            onChange={(v) =>
+              setApproveAmount(v === "" || v === null ? null : Number(v))
+            }
           />
-
-          <Select
-            label="Payment Status"
-            data={["Completed", "Pending", "Failed"]}
-            value={editStatus}
-            onChange={setEditStatus}
+          <Textarea
+            label="Note"
+            minRows={2}
+            value={approveNote}
+            onChange={(e) => setApproveNote(e.target.value)}
           />
-        </Group>
-
-        <DateInput
-          label="Payment Date"
-          value={editDate}
-          onChange={setEditDate}
-          mb="lg"
-        />
-
-        <Textarea
-          label="Notes"
-          placeholder="Update notes"
-          minRows={4}
-          value={editNotes}
-          onChange={(event) => setEditNotes(event.target.value)}
-        />
-
-        <Group justify="flex-end" mt="xl">
-          <Button variant="light" onClick={() => setEditOpened(false)}>
-            Cancel
+          <Button color="#9c6238" loading={saving} onClick={handleApprove}>
+            Send & await confirmation
           </Button>
-
-          <Button color="#9c6238" onClick={handleEditSave}>
-            Save Changes
-          </Button>
-        </Group>
+        </Stack>
       </Modal>
     </div>
   );

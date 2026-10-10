@@ -14,7 +14,6 @@ import {
   TextInput,
   Title,
   PasswordInput,
-  Stack,
   Table,
 } from "@mantine/core";
 
@@ -26,7 +25,8 @@ import { getStoredUser } from "../utils/authStorage";
 
 export const SettingsPage = () => {
   const stored = getStoredUser();
-  const isAdmin = stored?.membershipRole === "admin" || stored?.role === "organization";
+  const isAdmin =
+    stored?.membershipRole === "admin" || stored?.role === "organization";
 
   const [theme, setTheme] = useState("light");
   const [notifications, setNotifications] = useState(true);
@@ -36,30 +36,20 @@ export const SettingsPage = () => {
   const [profession, setProfession] = useState(stored?.profession || "Artisan");
 
   const [members, setMembers] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [assignments, setAssignments] = useState([]);
-
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitePassword, setInvitePassword] = useState("");
-  const [newProductName, setNewProductName] = useState("");
-  const [assignProductId, setAssignProductId] = useState(null);
-  const [assignUserId, setAssignUserId] = useState(null);
   const [saving, setSaving] = useState(false);
 
   const loadOrgData = async () => {
     if (!isAdmin) return;
     try {
-      const [orgRes, membersRes, productsRes, assignRes] = await Promise.all([
+      const [orgRes, membersRes] = await Promise.all([
         API.get("/organizations/me"),
         API.get("/organizations/members"),
-        API.get("/products"),
-        API.get("/products/assignments/list"),
       ]);
       setOrgName(orgRes.data.name || "");
       setMembers(membersRes.data || []);
-      setProducts(productsRes.data || []);
-      setAssignments(assignRes.data || []);
       if (orgRes.data.settings) {
         setTheme(orgRes.data.settings.theme || "light");
         setNotifications(orgRes.data.settings.notifications !== false);
@@ -80,7 +70,9 @@ export const SettingsPage = () => {
     }
     setSaving(true);
     try {
-      const { data } = await API.put("/organizations/rename", { name: orgName.trim() });
+      const { data } = await API.put("/organizations/rename", {
+        name: orgName.trim(),
+      });
       const updated = { ...stored, organizationName: data.name };
       localStorage.setItem("userInfo", JSON.stringify(updated));
       alert("Organization renamed");
@@ -97,7 +89,10 @@ export const SettingsPage = () => {
         name: profileName,
         profession,
       });
-      localStorage.setItem("userInfo", JSON.stringify({ ...stored, ...data, token: stored.token }));
+      localStorage.setItem(
+        "userInfo",
+        JSON.stringify({ ...stored, ...data, token: stored.token }),
+      );
       alert("Profile updated");
     } catch (err) {
       alert(err.response?.data?.message || "Update failed");
@@ -140,46 +135,6 @@ export const SettingsPage = () => {
     }
   };
 
-  const handleCreateProduct = async () => {
-    if (!newProductName.trim()) return;
-    try {
-      await API.post("/products", { name: newProductName.trim() });
-      setNewProductName("");
-      await loadOrgData();
-    } catch (err) {
-      alert(err.response?.data?.message || "Create failed");
-    }
-  };
-
-  const handleAssignProduct = async () => {
-    if (!assignProductId || !assignUserId) {
-      alert("Select a product and a member");
-      return;
-    }
-    try {
-      await API.post("/products/assignments", {
-        productId: assignProductId,
-        userId: assignUserId,
-      });
-      await loadOrgData();
-      alert("Product assigned");
-    } catch (err) {
-      alert(err.response?.data?.message || "Assignment failed");
-    }
-  };
-
-  const orgUserOptions = members
-    .filter((m) => m.status === "active" && m.role === "user" && m.user)
-    .map((m) => ({
-      value: m.user._id,
-      label: `${m.user.name} (${m.user.email})`,
-    }));
-
-  const productOptions = products.map((p) => ({
-    value: p._id,
-    label: p.name,
-  }));
-
   return (
     <div className={classes.page}>
       <div className={classes.header}>
@@ -189,7 +144,6 @@ export const SettingsPage = () => {
         </Text>
       </div>
 
-      {/* ORGANIZATION (Admin) */}
       {isAdmin && (
         <>
           <Text fw={700} className={classes.sectionTitle}>
@@ -202,7 +156,12 @@ export const SettingsPage = () => {
                 value={orgName}
                 onChange={(e) => setOrgName(e.target.value)}
               />
-              <Button color="#9c6238" w={180} loading={saving} onClick={handleRename}>
+              <Button
+                color="#9c6238"
+                w={180}
+                loading={saving}
+                onClick={handleRename}
+              >
                 Rename
               </Button>
             </Group>
@@ -277,61 +236,9 @@ export const SettingsPage = () => {
               </Table.Tbody>
             </Table>
           </Paper>
-
-          <Text fw={700} className={classes.sectionTitle}>
-            Products & Assignment
-          </Text>
-          <Paper withBorder radius="xl" p="xl" className={classes.card}>
-            <Group align="flex-end" mb="lg">
-              <TextInput
-                label="New Product"
-                placeholder="Product name"
-                value={newProductName}
-                onChange={(e) => setNewProductName(e.target.value)}
-                style={{ flex: 1 }}
-              />
-              <Button color="#9c6238" onClick={handleCreateProduct}>
-                Add Product
-              </Button>
-            </Group>
-
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mb="md">
-              <Select
-                label="Product"
-                data={productOptions}
-                value={assignProductId}
-                onChange={setAssignProductId}
-                placeholder="Select product"
-              />
-              <Select
-                label="Organization User"
-                data={orgUserOptions}
-                value={assignUserId}
-                onChange={setAssignUserId}
-                placeholder="Select member"
-              />
-            </SimpleGrid>
-            <Button color="#9c6238" mb="lg" onClick={handleAssignProduct}>
-              Assign Product
-            </Button>
-
-            <Stack gap="xs">
-              {assignments.map((a) => (
-                <Text key={a._id} size="sm">
-                  {a.product?.name} → {a.user?.name} ({a.user?.email})
-                </Text>
-              ))}
-              {assignments.length === 0 && (
-                <Text size="sm" c="dimmed">
-                  No product assignments yet.
-                </Text>
-              )}
-            </Stack>
-          </Paper>
         </>
       )}
 
-      {/* PROFILE SETTINGS */}
       <Text fw={700} className={classes.sectionTitle}>
         Profile Settings
       </Text>
@@ -378,14 +285,18 @@ export const SettingsPage = () => {
               ]}
             />
 
-            <Button mt="xl" color="#9c6238" w={180} onClick={handleUpdateProfile}>
+            <Button
+              mt="xl"
+              color="#9c6238"
+              w={180}
+              onClick={handleUpdateProfile}
+            >
               Update Profile
             </Button>
           </div>
         </div>
       </Paper>
 
-      {/* PREFERENCES */}
       <Text fw={700} className={classes.sectionTitle}>
         Preferences
       </Text>
@@ -488,7 +399,6 @@ export const SettingsPage = () => {
         </div>
       </Paper>
 
-      {/* DATA & BACKUP */}
       <Text fw={700} className={classes.sectionTitle}>
         Data & Backup
       </Text>

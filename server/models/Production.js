@@ -22,6 +22,28 @@ const productionSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      default: null,
+      index: true,
+    },
+    assignment: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ProductAssignment",
+      default: null,
+      index: true,
+    },
+    artisan: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    source: {
+      type: String,
+      enum: ["manual", "assignment"],
+      default: "manual",
+    },
   },
   { timestamps: true },
 );

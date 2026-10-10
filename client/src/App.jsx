@@ -16,6 +16,8 @@ import { ReportsPage } from "./pages/ReportsPage";
 import { AIAssistantPage } from "./pages/AIAssistantPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SecurityPage } from "./pages/SecurityPage";
+import { AdminProductsPage } from "./pages/AdminProductsPage";
+import { AdminAssignmentsPage } from "./pages/AdminAssignmentsPage";
 
 // Artisan Pages (Mobile Optimized) — also used by Organization Users
 import { ArtisanDashboard } from "./pages/ArtisanDashboard";
@@ -25,6 +27,8 @@ import { PriceAnalyser } from "./pages/PriceAnalyser";
 import { InventoryPage } from "./pages/InventoryPage";
 import { QualityCheck } from "./pages/QualityCheck";
 import { AnalyticsPage } from "./pages/AnalyticsPage";
+import { AssignmentsPage } from "./pages/AssignmentsPage";
+import { AssignmentDetailPage } from "./pages/AssignmentDetailPage";
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(
@@ -52,6 +56,8 @@ function App() {
             {role === "organization" && (
               <Route element={<MainLayout />}>
                 <Route path="/" element={<HomePage />} />
+                <Route path="/products" element={<AdminProductsPage />} />
+                <Route path="/assignments" element={<AdminAssignmentsPage />} />
                 <Route path="/production" element={<ProductionPage />} />
                 <Route path="/payments" element={<PaymentsPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
@@ -64,6 +70,11 @@ function App() {
             {role === "artisan" && (
               <>
                 <Route path="/" element={<ArtisanDashboard />} />
+                <Route path="/assignments" element={<AssignmentsPage />} />
+                <Route
+                  path="/assignments/:id"
+                  element={<AssignmentDetailPage />}
+                />
                 <Route path="/money-flow" element={<MoneyFlow />} />
                 <Route path="/settings" element={<ArtisanSettings />} />
                 <Route path="/price-analyser" element={<PriceAnalyser />} />

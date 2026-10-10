@@ -11,6 +11,10 @@ export const setupTestDB = async () => {
   mongoServer = await MongoMemoryServer.create();
   process.env.MONGO_URI = mongoServer.getUri();
   await mongoose.connect(process.env.MONGO_URI);
+  const { ensureAssignmentIndexes } = await import(
+    "../utils/ensureIndexes.js"
+  );
+  await ensureAssignmentIndexes();
 };
 
 export const teardownTestDB = async () => {
